@@ -3,7 +3,7 @@ import warnings
 import librosa
 import numpy as np
 import asyncio
-import pymysql
+import sqlite3
 from flask import Flask, request, render_template_string
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from sklearn.preprocessing import LabelEncoder
@@ -23,24 +23,38 @@ model_path = 'saved_models/audio_classification18_90(1).keras'
 model = load_model(model_path)
 
 
-DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': 'Subral@123',
-    'database': 'snore',  
-}
-
+DB_PATH = 'snore_audio.db'
 
 def save_prediction_to_db(file_name, classification, intensity, frequency, snore_index, consistency):
     try:
-        connection = pymysql.connect(**DB_CONFIG)
-        with connection.cursor() as cursor:
-            sql = """
-            INSERT INTO snoring_predictions (file_name, classification, intensity, frequency, snore_index, consistency)
-            VALUES (%s, %s, %s, %s, %s, %s);
-            """
-            cursor.execute(sql, (file_name, classification, intensity, frequency, snore_index, consistency))
-            connection.commit()
+        # Connect to SQLite3 database
+        connection = sqlite3.connect(DB_PATH)
+        cursor = connection.cursor()
+        
+        # Ensure the table exists
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS snoring_predictions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_name TEXT,
+            classification TEXT,
+            intensity REAL,
+            frequency REAL,
+            snore_index TEXT,
+            consistency TEXT
+        );
+        """)
+        
+        sql = """
+        INSERT INTO snoring_predictions 
+        (file_name, classification, intensity, frequency, snore_index, consistency)
+        VALUES (?, ?, ?, ?, ?, ?);
+        """
+        cursor.execute(sql, (file_name, classification, intensity, frequency, snore_index, consistency))
+        # cursor.execute("SELECT * FROM snoring_predictions")
+        # result = cursor.fetchall()
+        # print (result)
+        connection.commit()
+
     except Exception as e:
         print(f"Error saving to database: {e}")
     finally:
