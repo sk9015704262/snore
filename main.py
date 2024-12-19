@@ -129,7 +129,7 @@ def calculate_snore_index(intensity, frequency):
 def classify_snore_index(snore_index):
     if snore_index < 10.33:
         return "Mild"
-    elif snore_index < 66.66:
+    elif snore_index < 25:
         return "Moderate"
     else:
         return "Extreme"
