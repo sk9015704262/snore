@@ -10,14 +10,17 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    build-essential \
     libsndfile1 \
     libglib2.0-0 \
     libavcodec-extra \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Copy the requirements file
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt -v
 
 # Copy the application code
 COPY . .
