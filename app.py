@@ -194,6 +194,7 @@ def test_model(audio_file, model):
             )
             return f"Classification: {prediction_class}"
     except Exception as e:
+        print(e);
         return f"Error processing {audio_file}: {str(e)}"
 
 
