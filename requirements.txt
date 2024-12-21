@@ -40,6 +40,7 @@ protobuf==5.29.2
 pycparser==2.22
 Pygments==2.18.0
 requests==2.32.3
+resampy==0.4.3
 rich==13.9.4
 scikit-learn==1.6.0
 scipy==1.14.1
