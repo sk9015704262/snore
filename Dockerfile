@@ -1,5 +1,5 @@
-# Use an official Python runtime as the base image
-FROM python:3.9
+# Use Python 3.12 base image
+FROM python:3.12
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -15,9 +15,12 @@ RUN apt-get update && apt-get install -y \
     libavcodec-extra \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Copy requirements file
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Install distutils separately, then the rest of the dependencies
+RUN pip install --no-cache-dir distutils --no-build-isolation \
+    && pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code
 COPY . .
