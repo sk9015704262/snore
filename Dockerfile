@@ -18,10 +18,9 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements file
 COPY requirements.txt .
 
-RUN apt-get update && apt-get install -y python3-distutils
+
 # Install distutils separately, then the rest of the dependencies
-RUN pip install --no-cache-dir distutils --no-build-isolation \
-    && pip install --no-cache-dir -r requirements.txt
+RUN  pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code
 COPY . .
