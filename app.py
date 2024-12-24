@@ -4,6 +4,12 @@ import librosa
 import numpy as np
 import asyncio
 import sqlite3
+import io
+import datetime
+import base64
+from pydub import AudioSegment
+import soundfile as sf
+from scipy.io import wavfile
 from flask import Flask, request, render_template_string
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from sklearn.preprocessing import LabelEncoder
@@ -123,7 +129,7 @@ def analyze_snore_consistency(audio, sample_rate, model, frame_duration=0.4, fra
 def calculate_snore_index(intensity, frequency):
     normalized_intensity = np.clip((intensity - 50) / 50, 0, 1) * 100
     normalized_frequency = np.clip((frequency - 20) / 300, 0, 1) * 100
-    snore_index = (normalized_intensity * 0.4 + normalized_frequency * 0.3)
+    snore_index = (normalized_intensity * 0.4 + normalized_frequency * 0.3) 
     return np.clip(snore_index, 0, 100)
 
 def classify_snore_index(snore_index):
@@ -134,14 +140,37 @@ def classify_snore_index(snore_index):
     else:
         return "Extreme"
 
-# Test model and classify snoring
-def test_model(audio_file, model):
+
+def analyze_audio_directly(audio_binary):
+    """
+    Analyze audio directly from binary data without saving to disk
+    """
     try:
-        audio, sample_rate = librosa.load(audio_file, res_type='kaiser_fast')
+        # Try loading with scipy first
+        try:
+            audio_buffer = io.BytesIO(audio_binary)
+            sample_rate, audio = wavfile.read(audio_buffer)
+        except Exception as e:
+            # If scipy fails, try librosa as fallback
+            audio_buffer = io.BytesIO(audio_binary)
+            audio, sample_rate = librosa.load(audio_buffer, sr=None)
+            
+        # Convert to float32 if needed
+        if audio.dtype != np.float32:
+            audio = audio.astype(np.float32) / np.iinfo(audio.dtype).max
+            
+        # If stereo, convert to mono
+        if len(audio.shape) > 1:
+            audio = np.mean(audio, axis=1)
+        
+        # Ensure audio length is within acceptable range (10-30 seconds)
+        duration = len(audio) / sample_rate
+        if duration < 10:
+            return "Error: Audio length must be at least 10 seconds."
+        if duration > 30:
+            return "Error: Audio length must not exceed 30 seconds."
 
-        if len(audio) < sample_rate * 9 or len(audio) > sample_rate * 32:
-            return "Error: Audio length must be between 10 to 30 seconds."
-
+        # Extract features and analyze
         mfccs_features = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=30)
         delta_mfcc = librosa.feature.delta(mfccs_features)
         delta2_mfcc = librosa.feature.delta(mfccs_features, order=2)
@@ -155,48 +184,43 @@ def test_model(audio_file, model):
         if prediction_class == "Snoring":
             prediction_class = "Male-snoring"
 
+        # Initialize base result dictionary
+        result = {
+            'classification': prediction_class,
+            'audio_data': audio_binary
+        }
+
         if prediction_class != 'No-snoring':
+            # Calculate intensity
             rmse = librosa.feature.rms(y=audio)
             rmse_db = librosa.amplitude_to_db(rmse, ref=np.max)
             average_intensity = np.mean(rmse_db)
             target_dB = 72
             intensity = average_intensity + target_dB
 
+            # Calculate frequency
             stft = np.abs(librosa.stft(audio))
             freqs = librosa.fft_frequencies(sr=sample_rate)
             power_spectrum = np.sum(stft ** 2, axis=1)
             frequency = freqs[np.argmax(power_spectrum)]
 
+            # Calculate additional metrics
             snore_index = calculate_snore_index(intensity, frequency)
             severity = classify_snore_index(snore_index)
             consistency = analyze_snore_consistency(audio, sample_rate, model)
 
+            # Add additional metrics to result
+            result.update({
+                'intensity': round(intensity, 2),
+                'frequency': round(frequency, 2),
+                'snore_index': severity,
+                'consistency': consistency
+            })
 
-            save_prediction_to_db(
-                file_name=audio_file,
-                classification=prediction_class,
-                intensity=intensity,
-                frequency=frequency,
-                snore_index=severity,
-                consistency=consistency
-            )
+        return result
 
-            return f"Classification: {prediction_class}\nIntensity (dB): {intensity:.2f}\nFrequency (Hz): {frequency:.2f}\nSnore Index: {severity}\nConsistency: {consistency}"
-        else:
-            
-            save_prediction_to_db(
-                file_name=audio_file,
-                classification=prediction_class,
-                intensity=None,
-                frequency=None,
-                snore_index="N/A",
-                consistency="N/A"
-            )
-            return f"Classification: {prediction_class}"
     except Exception as e:
-        print(e);
-        return f"Error processing {audio_file}: {str(e)}"
-
+        return f"Error processing audio: {str(e)}"
 
 app = Flask(__name__)
 
@@ -460,7 +484,9 @@ def upload_file():
 
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder = new MediaRecorder(stream, {
+                        mimeType: 'audio/webm'
+                    });
 
                     audioChunks = [];
                     mediaRecorder.ondataavailable = event => {
@@ -469,6 +495,7 @@ def upload_file():
 
                     mediaRecorder.onstop = () => {
                         clearInterval(recordingTimer);
+                        
                         if (secondsElapsed < 9) {
                             alert("Recording must be at least 10 seconds long. Please record again.");
                             resetRecorder();
@@ -508,7 +535,7 @@ def upload_file():
                     }, 1000);
                 } catch (error) {
                     console.error("Error accessing microphone:", error);
-                    alert("Error accessing your microphone. Please ensure it is enabled.");
+                    alert("Error accessing your microphone. Please ensure it is enabled.", error);
                 }
             });
 
@@ -521,6 +548,8 @@ def upload_file():
                     mediaRecorder.stop();
                 }
             });
+
+            
 
             function resetRecorder() {
                 secondsElapsed = 0;
@@ -540,40 +569,80 @@ def upload_file():
     </html>
 
     """
+
+    def convert_to_wav(audio_binary):
+        try:
+            audio = AudioSegment.from_file(io.BytesIO(audio_binary))
+            wav_io = io.BytesIO()
+            audio.export(wav_io, format='wav')
+            wav_io.seek(0)
+            return wav_io.read()
+        except Exception as e:
+            raise ValueError(f"Audio conversion to WAV failed: {e}")
+
+    import datetime
     if request.method == 'POST':
-        import os
-        from flask import jsonify
-        if 'audiofile' in request.files and request.files['audiofile'].filename:
-            file = request.files['audiofile']
-            file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-            file.save(file_path)
-            saved_path = os.path.join(SAVED_FOLDER, file.filename)
-            if os.path.exists(saved_path):
-                return jsonify({"status": "error", "message": "File already exists on the server."})
+        try:
+            result = None
+            audio_binary = None
+            filename = None
 
-            os.rename(file_path, saved_path)
-            result = test_model(saved_path, model)
-        elif 'audio_data' in request.form:
-            import base64
-            import os
-            import datetime
-            audio_data = request.form['audio_data']
-            audio_binary = base64.b64decode(audio_data)
+            if 'audio_data' in request.form:
+                audio_data = request.form['audio_data']
+                audio_binary = base64.b64decode(audio_data)
+                timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+                filename = f"recorded_audio_{timestamp}.wav"
+            
+            elif 'audiofile' in request.files:
+                file = request.files['audiofile']
+                if file and file.filename:
+                    audio_binary = file.read()
+                    filename = file.filename
+                    try:
+                        audio_binary = convert_to_wav(audio_binary)
+                        filename = filename.rsplit('.', 1)[0] + ".wav"  
+                    except ValueError as e:
+                        return render_template_string(html_template, result=f"Error: {str(e)}")
+                else:
+                    return render_template_string(html_template, result="Error: No file selected")
 
-            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f') 
-            filename = f"recorded_audio_{timestamp}.wav"
-            file_path = os.path.join(SAVED_FOLDER, filename)
-            with open(file_path, 'wb') as f:
-                f.write(audio_binary)
-            result = test_model(file_path, model)
+            if audio_binary and filename:
+                # Analyze audio directly
+                audio_binary = convert_to_wav(audio_binary)
+                result = analyze_audio_directly(audio_binary)
+                
+                if isinstance(result, dict):
+                    # Save file only after successful analysis
+                    file_path = os.path.join(SAVED_FOLDER, filename)
+                    with open(file_path, 'wb') as f:
+                        f.write(audio_binary)
+                    
+                    # Save to database
+                    save_prediction_to_db(
+                        file_name=filename,
+                        classification=result['classification'],
+                        intensity=result.get('intensity'),
+                        frequency=result.get('frequency'),
+                        snore_index=result.get('snore_index', 'N/A'),
+                        consistency=result.get('consistency', 'N/A')
+                    )
+                    
+                    # Format result for display
+                    display_result = f"Classification: {result['classification']}\n"
+                    if 'intensity' in result:
+                        display_result += f"Intensity (dB): {result['intensity']}\n"
+                        display_result += f"Frequency (Hz): {result['frequency']}\n"
+                        display_result += f"Snore Index: {result['snore_index']}\n"
+                        display_result += f"Consistency: {result['consistency']}"
+                    
+                    return render_template_string(html_template, result=display_result)
+                else:
+                    return render_template_string(html_template, result=result)
 
-        else:
-            result = "Error: No valid audio file or recording provided."
-
-        return render_template_string(html_template, result=result)
+        except Exception as e:
+            return render_template_string(html_template, result=f"Error: {str(e)}")
 
     return render_template_string(html_template, result=None)
-
 
 if __name__ == '__main__':
     app.run(debug=True)
