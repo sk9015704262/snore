@@ -1,5 +1,5 @@
 # Use an official Python runtime as the base image
-FROM python:3.8.12
+FROM python:3.12.6
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     libsndfile1 \
     libglib2.0-0 \
     libavcodec-extra \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file
