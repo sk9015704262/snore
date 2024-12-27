@@ -15,6 +15,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.models import load_model
 from concurrent.futures import ThreadPoolExecutor
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -135,7 +136,7 @@ def calculate_snore_index(intensity, frequency):
 def classify_snore_index(snore_index):
     if snore_index < 10.33:
         return "Mild"
-    elif snore_index < 25:
+    elif snore_index < 27:
         return "Moderate"
     else:
         return "Extreme"
@@ -160,11 +161,14 @@ def analyze_audio_directly(audio_binary):
         if len(audio.shape) > 1:
             audio = np.mean(audio, axis=1)
         
+        gain = 4.0
+        audio = np.clip(audio * gain, -1.0, 1.0)
+        
         # Ensure audio length is within acceptable range (10-30 seconds)
         duration = len(audio) / sample_rate
-        if duration <= 10:
+        if duration < 10.0:
             return "Error: Audio length must be at least 10 seconds."
-        if duration >= 30:
+        if duration > 30.0:
             return "Error: Audio length must not exceed 30 seconds."
 
         # Extract features and analyze
@@ -192,7 +196,7 @@ def analyze_audio_directly(audio_binary):
             rmse = librosa.feature.rms(y=audio)
             rmse_db = librosa.amplitude_to_db(rmse, ref=np.max)
             average_intensity = np.mean(rmse_db)
-            target_dB = 72
+            target_dB = 60
             intensity = average_intensity + target_dB
 
             # Calculate frequency
@@ -220,6 +224,11 @@ def analyze_audio_directly(audio_binary):
         return f"Error processing audio: {str(e)}"
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app)
+
+app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024 
+app.config['WTF_CSRF_ENABLED'] = True
+app.config['MAX_CONTENT_PATH'] = 8 * 1024 * 1024  
 
 # Create directories for uploads and saved files
 UPLOAD_FOLDER = 'uploads'
@@ -469,6 +478,7 @@ def upload_file():
             let audioContext;
             let audioStream;
             let gainNode;
+            let mediaStreamDestination;
 
             const recordButton = document.getElementById("record-btn");
             const stopButton = document.getElementById("stop-btn");
@@ -497,16 +507,13 @@ def upload_file():
                     audioContext = new AudioContext();
                     audioStream = audioContext.createMediaStreamSource(stream);
                     gainNode = audioContext.createGain();
-                    
-                    // Set gain (volume boost) - adjust this value as needed
+                    mediaStreamDestination = audioContext.createMediaStreamDestination();
                     gainNode.gain.value = 4.0; 
 
-                    // Connect the audio nodes
                     audioStream.connect(gainNode);
-                    const destinationStream = audioContext.createMediaStreamDestination();
-                    gainNode.connect(destinationStream);
+                    gainNode.connect(mediaStreamDestination)
                     mediaRecorder = new MediaRecorder(stream, {
-                        mimeType: 'audio/mp4'
+                        mimeType: 'audio/M4A'
                     });
 
                     audioChunks = [];
@@ -549,9 +556,18 @@ def upload_file():
                         const seconds = String(secondsElapsed % 60).padStart(2, "0");
                         recordingTimerDisplay.textContent = `${minutes}:${seconds}`;
 
-                        if (secondsElapsed >= 31) {
+                        if (secondsElapsed > 29) {
                             mediaRecorder.stop();
-                            alert("Recording stopped automatically after 30 seconds.");
+                            mediaRecorder.onstop = () => {
+                                clearInterval(recordingTimer);
+                                const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                    audioDataInput.value = reader.result.split(",")[1];
+                                    document.getElementById('recording-form').submit();
+                                };
+                                reader.readAsDataURL(audioBlob);
+                            };
                         }
                     }, 1000);
                 } catch (error) {
@@ -575,6 +591,12 @@ def upload_file():
                 recordingTimerDisplay.textContent = "00:00";
                 recordButton.disabled = false;
                 stopButton.disabled = true;
+
+                if (audioContext && audioContext.state !== 'closed') {
+                audioStream?.disconnect();
+                gainNode?.disconnect();
+                mediaStreamDestination?.disconnect();
+    }
             }
             function closePopup() {
                 document.getElementById('popup').classList.add('hide');
