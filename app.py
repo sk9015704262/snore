@@ -6,7 +6,6 @@ import asyncio
 import sqlite3
 import io
 import datetime
-import base64
 from pydub import AudioSegment
 import soundfile as sf
 from scipy.io import wavfile
@@ -226,9 +225,9 @@ def analyze_audio_directly(audio_binary):
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app)
 
-app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024 
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 
 app.config['WTF_CSRF_ENABLED'] = True
-app.config['MAX_CONTENT_PATH'] = 8 * 1024 * 1024  
+app.config['MAX_CONTENT_PATH'] = 16 * 1024 * 1024  
 
 # Create directories for uploads and saved files
 UPLOAD_FOLDER = 'uploads'
@@ -451,8 +450,7 @@ def upload_file():
                 <button id="stop-btn" disabled>Stop Recording</button>
                 <p>Recording Duration: <span id="recording-timer">00:00</span></p>
                 <audio id="audio-playback" controls></audio>
-                <form id="recording-form" method="POST" enctype="multipart/form-data" onsubmit="document.getElementById('loader').style.display='block';">
-                    <input type="hidden" id="audio-data" name="audio_data">
+                <form id="recording-form" method="POST" enctype="multipart/form-data">
                     <button type="submit" id="analyze-btn" disabled>Analyze Recording</button>
                 </form>
             </div>
@@ -479,112 +477,36 @@ def upload_file():
             let audioStream;
             let gainNode;
             let mediaStreamDestination;
+            let currentStream = null;
 
             const recordButton = document.getElementById("record-btn");
             const stopButton = document.getElementById("stop-btn");
             const audioPlayback = document.getElementById("audio-playback");
             const analyzeButton = document.getElementById("analyze-btn");
-            const audioDataInput = document.getElementById("audio-data");
+            const recordingForm = document.getElementById("recording-form");
             const recordingTimerDisplay = document.getElementById("recording-timer");
 
-            recordButton.addEventListener("click", async () => {
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    alert("Your browser does not support audio recording.");
-                    return; 
-                }
-
+            async function submitForm(formData) {
+                document.getElementById('loader').style.display = 'block';
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
-                        audio: {
-                        autoGainControl: true,
-                        noiseSuppression: false,
-                        echoCancellation: false,
-                        channelCount: 1,
-                        sampleRate: 44100
-                        }  
-                });
-
-                    audioContext = new AudioContext();
-                    audioStream = audioContext.createMediaStreamSource(stream);
-                    gainNode = audioContext.createGain();
-                    mediaStreamDestination = audioContext.createMediaStreamDestination();
-                    gainNode.gain.value = 4.0; 
-
-                    audioStream.connect(gainNode);
-                    gainNode.connect(mediaStreamDestination)
-                    mediaRecorder = new MediaRecorder(stream, {
-                        mimeType: 'audio/M4A'
+                    const response = await fetch(window.location.href, {
+                        method: 'POST',
+                        body: formData
                     });
-
-                    audioChunks = [];
-                    mediaRecorder.ondataavailable = event => {
-                        audioChunks.push(event.data);
-                    };
-
-                    mediaRecorder.onstop = () => {
-                        clearInterval(recordingTimer);
-                        
-                        if (secondsElapsed < 9) {
-                            alert("Recording must be at least 10 seconds long. Please record again.");
-                            resetRecorder();
-                            return;
-                        }
-
-                        const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
-                        const audioURL = URL.createObjectURL(audioBlob);
-                        audioPlayback.src = audioURL;
-
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                            audioDataInput.value = reader.result.split(",")[1];
-                        };
-                        reader.readAsDataURL(audioBlob);
-
-                        analyzeButton.disabled = false;
-
-                        resetRecorder();
-                    };
-
-                    mediaRecorder.start();
-                    recordButton.disabled = true;
-                    stopButton.disabled = false;
-
-                    // Start timer
-                    recordingTimer = setInterval(() => {
-                        secondsElapsed++;
-                        const minutes = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
-                        const seconds = String(secondsElapsed % 60).padStart(2, "0");
-                        recordingTimerDisplay.textContent = `${minutes}:${seconds}`;
-
-                        if (secondsElapsed > 29) {
-                            mediaRecorder.stop();
-                            mediaRecorder.onstop = () => {
-                                clearInterval(recordingTimer);
-                                const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
-                                const reader = new FileReader();
-                                reader.onload = () => {
-                                    audioDataInput.value = reader.result.split(",")[1];
-                                    document.getElementById('recording-form').submit();
-                                };
-                                reader.readAsDataURL(audioBlob);
-                            };
-                        }
-                    }, 1000);
-                } catch (error) {
-                    console.error("Error accessing microphone:", error);
-                    alert("Error accessing your microphone. Please ensure it is enabled.", error);
-                }
-            });
-
-            stopButton.addEventListener("click", () => {
-                if (mediaRecorder && mediaRecorder.state === "recording") {
-                   if (secondsElapsed < 10) {
-                        alert("Recording must be at least 10 seconds long. Please continue recording.");
-                        return;
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
                     }
-                    mediaRecorder.stop();
+                    
+                    const result = await response.text();
+                    document.documentElement.innerHTML = result;
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Error uploading recording: ' + error.message);
+                } finally {
+                    document.getElementById('loader').style.display = 'none';
                 }
-            });
+            }
 
             function resetRecorder() {
                 secondsElapsed = 0;
@@ -598,17 +520,119 @@ def upload_file():
                 mediaStreamDestination?.disconnect();
     }
             }
-            function closePopup() {
-                document.getElementById('popup').classList.add('hide');
-                document.getElementById('popup').classList.remove('show');
-                document.getElementById('overlay').classList.remove('show');
-            }
 
+
+            recordButton.addEventListener("click", async () => {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    alert("Your browser does not support audio recording.");
+                    return;
+                }
+
+                try {
+                    // Ensure any old streams are stopped
+                    resetRecorder();
+
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        audio: {
+                            autoGainControl: true,
+                            noiseSuppression: false,
+                            echoCancellation: false,
+                            channelCount: 1,
+                            sampleRate: 44100
+                        }  
+                    });
+
+                    currentStream = stream; 
+                    audioContext = new AudioContext();
+                    audioStream = audioContext.createMediaStreamSource(stream);
+                    gainNode = audioContext.createGain();
+                    mediaStreamDestination = audioContext.createMediaStreamDestination();
+                    gainNode.gain.value = 4.0;
+
+                    audioStream.connect(gainNode);
+                    gainNode.connect(mediaStreamDestination);
+                    mediaRecorder = new MediaRecorder(stream);
+
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        clearInterval(recordingTimer);
+
+                        if (secondsElapsed < 10) {
+                            alert("Recording must be at least 10 seconds long. Keep going.");
+                            resetRecorder();
+                            return;
+                        }
+
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const audioURL = URL.createObjectURL(audioBlob);
+                        audioPlayback.src = audioURL;
+
+                        const audioFile = new File([audioBlob], `recording_${Date.now()}.mp4`, {
+                            type: 'audio/mp4'
+                        });
+
+                        const formData = new FormData();
+                        formData.append("audiofile", audioFile);
+
+                        recordingForm.onsubmit = async (e) => {
+                            e.preventDefault();
+                            await submitForm(formData);
+                        };
+
+                        analyzeButton.disabled = false;
+                        recordButton.disabled = false;
+                    };
+
+                    mediaRecorder.start();
+                    recordButton.disabled = true;
+                    stopButton.disabled = false;
+
+                    recordingTimer = setInterval(() => {
+                        secondsElapsed++;
+                        if (recordingTimerDisplay) {
+                            const minutes = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
+                            const seconds = String(secondsElapsed % 60).padStart(2, "0");
+                            recordingTimerDisplay.textContent = `${minutes}:${seconds}`;
+                        }
+
+                        if (secondsElapsed >= 30) {
+                            mediaRecorder.stop();
+                            alert("Recording must be at most 30 seconds long.");
+                        }
+                    }, 1000);
+                } catch (error) {
+                    console.error("Error accessing microphone:", error);
+                    alert("Error accessing your microphone. Please ensure it is enabled.");
+                }
+            });
+
+
+            stopButton.addEventListener("click", () => {
+                if (mediaRecorder && mediaRecorder.state === "recording") {
+                    if (secondsElapsed < 10) {
+                        alert("Recording must be at least 10 seconds long. Please continue recording.");
+                        return;
+                    }
+                    mediaRecorder.stop();
+                }
+            });
+
+            
+
+            function closePopup() {
+                const popup = document.getElementById('popup');
+                const overlay = document.getElementById('overlay');
+                if (popup) popup.classList.add('hide');
+                if (popup) popup.classList.remove('show');
+                if (overlay) overlay.classList.remove('show');
+            }
         </script>
-        <div id="overlay" class="{% if result %}show{% else %}hide{% endif %}"></div>
     </body>
     </html>
-
     """
 
     def convert_to_wav(audio_binary):
@@ -624,66 +648,64 @@ def upload_file():
     import datetime
     if request.method == 'POST':
         try:
-            result = None
-            audio_binary = None
-            filename = None
-
-            if 'audio_data' in request.form:
-                audio_data = request.form['audio_data']
-                audio_binary = base64.b64decode(audio_data)
-                timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f')
-                filename = f"recorded_audio_{timestamp}.mp3"
-            
-            elif 'audiofile' in request.files:
-                file = request.files['audiofile']
-                if file and file.filename:
-                    audio_binary = file.read()
-                    filename = file.filename
-                    try:
-                        audio_binary = convert_to_wav(audio_binary)
-                        filename = filename.rsplit('.', 1)[0] + ".wav"  
-                    except ValueError as e:
-                        return render_template_string(html_template, result=f"Error: {str(e)}")
-                else:
-                    return render_template_string(html_template, result="Error: No file selected")
-
-            if audio_binary and filename:
-                # Analyze audio directly
-                audio_binary = convert_to_wav(audio_binary)
-                result = analyze_audio_directly(audio_binary)
+            if 'audiofile' not in request.files:
+                return render_template_string(html_template, result="Error: No file provided")
                 
-                if isinstance(result, dict):
-                    # Save file only after successful analysis
-                    file_path = os.path.join(SAVED_FOLDER, filename)
-                    with open(file_path, 'wb') as f:
-                        f.write(audio_binary)
-                    
-                    # Save to database
-                    save_prediction_to_db(
-                        file_name=filename,
-                        classification=result['classification'],
-                        intensity=result.get('intensity'),
-                        frequency=result.get('frequency'),
-                        snore_index=result.get('snore_index', 'N/A'),
-                        consistency=result.get('consistency', 'N/A')
-                    )
-                    
-                    # Format result for display
-                    display_result = f"Classification: {result['classification']}\n"
-                    if 'intensity' in result:
-                        display_result += f"Intensity (dB): {result['intensity']}\n"
-                        display_result += f"Frequency (Hz): {result['frequency']}\n"
-                        display_result += f"Snore Index: {result['snore_index']}\n"
-                        display_result += f"Consistency: {result['consistency']}"
-                    
-                    return render_template_string(html_template, result=display_result)
-                else:
-                    return render_template_string(html_template, result=result)
+            file = request.files['audiofile']
+            if not file:
+                return render_template_string(html_template, result="Error: No file selected")
+
+            audio_binary = file.read()
+            filename = file.filename
+            
+            try:
+                audio = AudioSegment.from_file(io.BytesIO(audio_binary))
+                
+                # Apply gain (4.0 = +12dB)
+                audio = audio + 12
+                
+                # Export as WAV
+                wav_io = io.BytesIO()
+                audio.export(wav_io, format='wav')
+                audio_binary = wav_io.getvalue()
+                filename = filename.rsplit('.', 1)[0] + ".wav"
+            except ValueError as e:
+                return render_template_string(html_template, result=f"Error: {str(e)}")
+
+            # Analyze audio directly
+            result = analyze_audio_directly(audio_binary)
+            
+            if isinstance(result, dict):
+                # Save file only after successful analysis
+                file_path = os.path.join(SAVED_FOLDER, filename)
+                with open(file_path, 'wb') as f:
+                    f.write(audio_binary)
+                
+                # Save to database
+                save_prediction_to_db(
+                    file_name=filename,
+                    classification=result['classification'],
+                    intensity=result.get('intensity'),
+                    frequency=result.get('frequency'),
+                    snore_index=result.get('snore_index', 'N/A'),
+                    consistency=result.get('consistency', 'N/A')
+                )
+                
+                # Format result for display
+                display_result = f"Classification: {result['classification']}\n"
+                if 'intensity' in result:
+                    display_result += f"Intensity (dB): {result['intensity']}\n"
+                    display_result += f"Frequency (Hz): {result['frequency']}\n"
+                    display_result += f"Snore Index: {result['snore_index']}\n"
+                    display_result += f"Consistency: {result['consistency']}"
+                
+                return render_template_string(html_template, result=display_result)
+            else:
+                return render_template_string(html_template, result=result)
 
         except Exception as e:
             return render_template_string(html_template, result=f"Error: {str(e)}")
 
     return render_template_string(html_template, result=None)
-
 if __name__ == '__main__':
     app.run(debug=True)
