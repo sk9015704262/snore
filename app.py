@@ -142,9 +142,6 @@ def classify_snore_index(snore_index):
 
 
 def analyze_audio_directly(audio_binary):
-    """
-    Analyze audio directly from binary data without saving to disk
-    """
     try:
         # Try loading with scipy first
         try:
@@ -165,9 +162,9 @@ def analyze_audio_directly(audio_binary):
         
         # Ensure audio length is within acceptable range (10-30 seconds)
         duration = len(audio) / sample_rate
-        if duration < 10:
+        if duration <= 10:
             return "Error: Audio length must be at least 10 seconds."
-        if duration > 30:
+        if duration >= 30:
             return "Error: Audio length must not exceed 30 seconds."
 
         # Extract features and analyze
@@ -469,6 +466,10 @@ def upload_file():
             let recordingTimer;
             let secondsElapsed = 0;
 
+            let audioContext;
+            let audioStream;
+            let gainNode;
+
             const recordButton = document.getElementById("record-btn");
             const stopButton = document.getElementById("stop-btn");
             const audioPlayback = document.getElementById("audio-playback");
@@ -479,13 +480,33 @@ def upload_file():
             recordButton.addEventListener("click", async () => {
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                     alert("Your browser does not support audio recording.");
-                    return;
+                    return; 
                 }
 
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        audio: {
+                        autoGainControl: true,
+                        noiseSuppression: false,
+                        echoCancellation: false,
+                        channelCount: 1,
+                        sampleRate: 44100
+                        }  
+                });
+
+                    audioContext = new AudioContext();
+                    audioStream = audioContext.createMediaStreamSource(stream);
+                    gainNode = audioContext.createGain();
+                    
+                    // Set gain (volume boost) - adjust this value as needed
+                    gainNode.gain.value = 4.0; 
+
+                    // Connect the audio nodes
+                    audioStream.connect(gainNode);
+                    const destinationStream = audioContext.createMediaStreamDestination();
+                    gainNode.connect(destinationStream);
                     mediaRecorder = new MediaRecorder(stream, {
-                        mimeType: 'audio/webm'
+                        mimeType: 'audio/mp4'
                     });
 
                     audioChunks = [];
@@ -549,8 +570,6 @@ def upload_file():
                 }
             });
 
-            
-
             function resetRecorder() {
                 secondsElapsed = 0;
                 recordingTimerDisplay.textContent = "00:00";
@@ -591,7 +610,7 @@ def upload_file():
                 audio_data = request.form['audio_data']
                 audio_binary = base64.b64decode(audio_data)
                 timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f')
-                filename = f"recorded_audio_{timestamp}.wav"
+                filename = f"recorded_audio_{timestamp}.mp3"
             
             elif 'audiofile' in request.files:
                 file = request.files['audiofile']
