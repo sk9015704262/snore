@@ -587,11 +587,9 @@ def upload_file():
 
                         const stream = await navigator.mediaDevices.getUserMedia({ 
                             audio: {
-                                autoGainControl: true,
+                                autoGainControl: false,
                                 noiseSuppression: false,
-                                echoCancellation: false,
-                                channelCount: 2,
-                                sampleRate: 48000
+                                channelCount: 2
                             }  
                         });
 
@@ -749,8 +747,13 @@ def upload_file():
                     consistency=result.get('consistency', 'N/A')
                 )
                 
+                
+                display_result = f""
                 # Format result for display
-                display_result = f"Classification: {result['classification']}\n"
+                if result['classification'] == "No-snoring":
+                    display_result = f"Classification: {result['classification']}\n"
+
+                
                 if 'intensity' in result:
                     display_result += f"Intensity (dB): {result['intensity']}\n"
                     display_result += f"Frequency (Hz): {result['frequency']}\n"
