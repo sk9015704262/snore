@@ -142,6 +142,7 @@ def classify_snore_index(snore_index):
 
 
 def analyze_audio_directly(audio_binary):
+    print(type(audio_binary), "analyse_audio_directly")
     try:
         # Try loading with scipy first
         try:
@@ -429,6 +430,7 @@ def upload_file():
                 display: block;
             }
         </style>
+        
     </head>
     <body>
         <h1>Snoring Detection</h1>
@@ -465,215 +467,229 @@ def upload_file():
         {% endif %}
         <pre id="result" class="hide"></pre>
 
-        <script>
-            let mediaRecorder;
-            let audioChunks = [];
-            let recordingTimer;
-            let secondsElapsed = 0;
+            <script>
+                let mediaRecorder;
+                let audioChunks = [];
+                let recordingTimer;
+                let secondsElapsed = 0;
 
-            let audioContext;
-            let audioStream;
-            let gainNode;
-            let mediaStreamDestination;
-            let currentStream = null;
+                let audioContext;
+                let audioStream;
+                let gainNode;
+                let mediaStreamDestination;
+                let currentStream = null;
 
-            const recordButton = document.getElementById("record-btn");
-            const stopButton = document.getElementById("stop-btn");
-            const audioPlayback = document.getElementById("audio-playback");
-            const analyzeButton = document.getElementById("analyze-btn");
-            const recordingForm = document.getElementById("recording-form");
-            const recordingTimerDisplay = document.getElementById("recording-timer");
+                const recordButton = document.getElementById("record-btn");
+                const stopButton = document.getElementById("stop-btn");
+                const audioPlayback = document.getElementById("audio-playback");
+                const analyzeButton = document.getElementById("analyze-btn");
+                const recordingForm = document.getElementById("recording-form");
+                const recordingTimerDisplay = document.getElementById("recording-timer");
 
-            async function submitForm(formData) {
-                document.getElementById('loader').style.display = 'block';
-                try {
-                    const response = await fetch(window.location.href, {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    
-                    const result = await response.text();
-                    
-                    // Parse the response to extract just the result
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(result, 'text/html');
-                    const resultText = doc.querySelector('#result')?.textContent;
-                    
-                    if (resultText) {
-                        // Create and show popup with result
-                        const popupHTML = `
-                            <div id="popup" class="popup show">
-                                <div class="popup-header">
-                                    <span>Result</span>
-                                    <button class="close-btn" onclick="closePopup()">×</button>
-                                </div>
-                                <pre id="result">${resultText}</pre>
-                            </div>`;
-                        
-                        // Remove existing popup if any
-                        const existingPopup = document.getElementById('popup');
-                        if (existingPopup) {
-                            existingPopup.remove();
-                        }
-                        
-                        // Add new popup
-                        document.body.insertAdjacentHTML('beforeend', popupHTML);
-                    }
-                    
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('Error uploading recording: ' + error.message);
-                } finally {
-                    document.getElementById('loader').style.display = 'none';
-                }
-            }
-
-            function resetRecorder() {
-                secondsElapsed = 0;
-                recordingTimerDisplay.textContent = "00:00";
-                recordButton.disabled = false;
-                stopButton.disabled = true;
-                analyzeButton.disabled = true;
-
-                if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                    mediaRecorder.stop();
-                }
-
-                // Stop all tracks in the current stream
-                if (currentStream) {
-                    currentStream.getTracks().forEach(track => track.stop());
-                    currentStream = null;
-                }
-
-                // Clear audio chunks
-                audioChunks = [];
-
-                // Reset audio context and related objects
-                if (audioContext && audioContext.state !== 'closed') {
-                    audioStream?.disconnect();
-                    gainNode?.disconnect();
-                    mediaStreamDestination?.disconnect();
-                    audioContext.close();
-                }
-
-                audioContext = null;
-                audioStream = null;
-                gainNode = null;
-                mediaStreamDestination = null;
-                mediaRecorder = null;
-            }
-
-            recordButton.addEventListener("click", async () => {
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    alert("Your browser does not support audio recording.");
-                    return;
-                }
-
-                try {
-                    resetRecorder();
-
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
-                        audio: {
-                            autoGainControl: true,
-                            noiseSuppression: false,
-                            echoCancellation: false,
-                            channelCount: 1,
-                            sampleRate: 44100
-                        }  
-                    });
-
-                    currentStream = stream; 
-                    audioContext = new AudioContext();
-                    audioStream = audioContext.createMediaStreamSource(stream);
-                    gainNode = audioContext.createGain();
-                    mediaStreamDestination = audioContext.createMediaStreamDestination();
-                    gainNode.gain.value = 4.0;
-
-                    audioStream.connect(gainNode);
-                    gainNode.connect(mediaStreamDestination);
-                    mediaRecorder = new MediaRecorder(stream);
-
-                    audioChunks = [];
-                    mediaRecorder.ondataavailable = event => {
-                        audioChunks.push(event.data);
-                    };
-
-                    mediaRecorder.onstop = () => {
-                        clearInterval(recordingTimer);
-
-                        if (secondsElapsed < 10) {
-                            alert("Recording must be at least 10 seconds long. Keep going.");
-                            resetRecorder();
-                            return;
-                        }
-
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/mp4' });
-                        const audioURL = URL.createObjectURL(audioBlob);
-                        audioPlayback.src = audioURL;
-
-                        const audioFile = new File([audioBlob], `recording_${Date.now()}.mp4`, {
-                            type: 'audio/mp4'
+                async function submitForm(formData) {
+                console.log("Submitting form data")
+                    document.getElementById('loader').style.display = 'block';
+                    try {
+                        const response = await fetch(window.location.href, {
+                            method: 'POST',
+                            body: formData
                         });
-
-                        const formData = new FormData();
-                        formData.append("audiofile", audioFile);
-
-                        recordingForm.onsubmit = async (e) => {
-                            e.preventDefault();
-                            await submitForm(formData);
-                        };
-
-                        analyzeButton.disabled = false;
-                        recordButton.disabled = false;
-                    };
-
-                    mediaRecorder.start();
-                    recordButton.disabled = true;
-                    stopButton.disabled = false;
-
-                    recordingTimer = setInterval(() => {
-                        secondsElapsed++;
-                        const minutes = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
-                        const seconds = String(secondsElapsed % 60).padStart(2, "0");
-                        recordingTimerDisplay.textContent = `${minutes}:${seconds}`;
-
-                        if (secondsElapsed >= 30) {
-                            mediaRecorder.stop();
-                            alert("Recording must be at most 30 seconds long.");
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
                         }
-                    }, 1000);
-                } catch (error) {
-                    console.error("Error accessing microphone:", error);
-                    alert("Error accessing your microphone. Please ensure it is enabled.");
+                        
+                        const result = await response.text();
+                        
+                        // Parse the response to extract just the result
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(result, 'text/html');
+                        const resultText = doc.querySelector('#result')?.textContent;
+                        
+                        if (resultText) {
+                            // Create and show popup with result
+                            console.log("Server response received:", resultText);
+                            const popupHTML = `
+                                <div id="popup" class="popup show">
+                                    <div class="popup-header">
+                                        <span>Result</span>
+                                        <button class="close-btn" onclick="closePopup()">×</button>
+                                    </div>
+                                    <pre id="result">${resultText}</pre>
+                                </div>`;
+                            
+                            // Remove existing popup if any
+                            const existingPopup = document.getElementById('popup');
+                            if (existingPopup) {
+                                existingPopup.remove();
+                            }
+                            
+                            // Add new popup
+                            document.body.insertAdjacentHTML('beforeend', popupHTML);
+                        }
+                        
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('Error uploading recording: ' + error.message);
+                    } finally {
+                        document.getElementById('loader').style.display = 'none';
+                    }
                 }
-            });
 
-            stopButton.addEventListener("click", () => {
-                if (mediaRecorder && mediaRecorder.state === "recording") {
-                    if (secondsElapsed < 10) {
-                        alert("Recording must be at least 10 seconds long. Please continue recording.");
+                function resetRecorder() {
+                    console.log("Resetting recorder...");
+                    secondsElapsed = 0;
+                    recordingTimerDisplay.textContent = "00:00";
+                    recordButton.disabled = false;
+                    stopButton.disabled = true;
+                    analyzeButton.disabled = true;
+
+                    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                        console.log("Stopping MediaRecorder...");
+                        mediaRecorder.stop();
+                    }
+
+                    // Stop all tracks in the current stream
+                    if (currentStream) {
+                        console.log("Stopping all audio tracks...");
+                        currentStream.getTracks().forEach(track => track.stop());
+                        currentStream = null;
+                    }
+
+                    // Clear audio chunks
+                    audioChunks = [];
+
+                    // Reset audio context and related objects
+                    if (audioContext && audioContext.state !== 'closed') {
+                        console.log("Closing audio context...");
+                        audioStream?.disconnect();
+                        gainNode?.disconnect();
+                        mediaStreamDestination?.disconnect();
+                        audioContext.close();
+                    }
+
+                    audioContext = null;
+                    audioStream = null;
+                    gainNode = null;
+                    mediaStreamDestination = null;
+                    mediaRecorder = null;
+                }
+
+                recordButton.addEventListener("click", async () => {
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        alert("Your browser does not support audio recording.");
                         return;
                     }
-                    mediaRecorder.stop();
+
+                    try {
+                        console.log("Starting audio recording...");
+                        resetRecorder();
+
+                        const stream = await navigator.mediaDevices.getUserMedia({ 
+                            audio: {
+                                autoGainControl: true,
+                                noiseSuppression: false,
+                                echoCancellation: false,
+                                channelCount: 2,
+                                sampleRate: 48000
+                            }  
+                        });
+
+                        currentStream = stream; 
+                        audioContext = new AudioContext();
+                        audioStream = audioContext.createMediaStreamSource(stream);
+                        gainNode = audioContext.createGain();
+                        mediaStreamDestination = audioContext.createMediaStreamDestination();
+                        gainNode.gain.value = 4.0;
+
+                        audioStream.connect(gainNode);
+                        gainNode.connect(mediaStreamDestination);
+                        mediaRecorder = new MediaRecorder(stream);
+
+                        audioChunks = [];
+                        mediaRecorder.ondataavailable = event => {
+                            audioChunks.push(event.data);
+                            console.log(event.data, "Type of Recoreded Audio file")
+                        };
+
+
+                        mediaRecorder.onstop = async () => {
+                            clearInterval(recordingTimer);
+
+                            if (secondsElapsed < 10) {
+                                alert("Recording must be at least 10 seconds long. Keep going.");
+                                resetRecorder();
+                                return;
+                            }
+
+                            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                            const audioURL = URL.createObjectURL(audioBlob);
+                            audioPlayback.src = audioURL;
+
+                            const audioFile = new File([audioBlob], `recording_${Date.now()}.wav`, {
+                                type: 'audio/wav'
+                            });
+
+                            const formData = new FormData();
+                            formData.append("audiofile", audioFile);
+
+                            recordingForm.onsubmit = async (e) => {
+                                e.preventDefault();
+                                await submitForm(formData);
+                            };
+
+                            analyzeButton.disabled = false;
+                            recordButton.disabled = false;
+
+                            console.log("Audio file created:");
+                            console.log(` - Name: ${audioFile.name}`);
+                            console.log(` - Type: ${audioFile.type}`);
+                            console.log(` - Size: ${audioFile.size} bytes`);
+                            console.log(` - Last Modified: ${new Date(audioFile.lastModified).toLocaleString()}`);
+                        };
+
+                        mediaRecorder.start();
+                        recordButton.disabled = true;
+                        stopButton.disabled = false;
+
+                        recordingTimer = setInterval(() => {
+                            secondsElapsed++;
+                            const minutes = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
+                            const seconds = String(secondsElapsed % 60).padStart(2, "0");
+                            recordingTimerDisplay.textContent = `${minutes}:${seconds}`;
+
+                            if (secondsElapsed >= 30) {
+                                mediaRecorder.stop();
+                                alert("Recording must be at most 30 seconds long.");
+                            }
+                        }, 1000);
+                    } catch (error) {
+                        console.error("Error accessing microphone:", error);
+                        alert("Error accessing your microphone. Please ensure it is enabled.");
+                    }
+                });
+
+                stopButton.addEventListener("click", () => {
+                    if (mediaRecorder && mediaRecorder.state === "recording") {
+                        if (secondsElapsed < 10) {
+                            alert("Recording must be at least 10 seconds long. Please continue recording.");
+                            return;
+                        }
+                        mediaRecorder.stop();
+                    }
+                });
+                
+                function closePopup() {
+                    const popup = document.getElementById('popup');
+                    if (popup) {
+                        popup.classList.add('hide');
+                        popup.classList.remove('show');
+                    }
+                    resetRecorder();
                 }
-            });
-            
-            function closePopup() {
-                const popup = document.getElementById('popup');
-                if (popup) {
-                    popup.classList.add('hide');
-                    popup.classList.remove('show');
-                }
-                resetRecorder();
-            }
-        </script>
+            </script>
     </body>
     </html>
-    
     """
 
     def convert_to_wav(audio_binary):
@@ -693,6 +709,7 @@ def upload_file():
                 return render_template_string(html_template, result="Error: No file provided")
                 
             file = request.files['audiofile']
+            print(type(file))
             if not file:
                 return render_template_string(html_template, result="Error: No file selected")
 
@@ -748,5 +765,6 @@ def upload_file():
             return render_template_string(html_template, result=f"Error: {str(e)}")
 
     return render_template_string(html_template, result=None)
+
 if __name__ == '__main__':
     app.run(debug=True)
