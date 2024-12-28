@@ -246,6 +246,7 @@ def upload_file():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Snoring Detection dev</title>
         <style>
+            /* Keep all existing styles unchanged */
             body {
                 display: flex;
                 flex-direction: column;
@@ -336,7 +337,6 @@ def upload_file():
                 height: 40px;
                 animation: spin 1s linear infinite;
             }
-            
 
             audio {
                 margin-top: 10px;
@@ -362,21 +362,13 @@ def upload_file():
             }
 
             @keyframes fadeIn {
-                from {
-                    opacity: 0;
-                }
-                to {
-                    opacity: 1;
-                }
+                from { opacity: 0; }
+                to { opacity: 1; }
             }
 
             @keyframes spin {
-                0% {
-                    transform: rotate(0deg);
-                }
-                100% {
-                    transform: rotate(360deg);
-                }
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
             }
 
             .popup {
@@ -392,6 +384,7 @@ def upload_file():
                 max-width: 500px;
                 z-index: 1000;
             }
+
             .popup-header {
                 display: flex;
                 justify-content: space-between;
@@ -399,6 +392,7 @@ def upload_file():
                 margin-bottom: 10px;
                 font-weight: bold;
             }
+
             .close-btn {
                 background: none;
                 border: none;
@@ -407,16 +401,19 @@ def upload_file():
                 cursor: pointer;
                 color: #333;
             }
+
             .close-btn:hover {
                 color: red;
             }
+
             .show {
                 display: block;
             }
+
             .hide {
                 display: none;
             }
-            /* Background overlay */
+
             #overlay {
                 position: fixed;
                 top: 0;
@@ -427,6 +424,7 @@ def upload_file():
                 z-index: 999;
                 display: none;
             }
+
             #overlay.show {
                 display: block;
             }
@@ -466,7 +464,7 @@ def upload_file():
         </div>
         {% endif %}
         <pre id="result" class="hide"></pre>
-        
+
         <script>
             let mediaRecorder;
             let audioChunks = [];
@@ -499,7 +497,33 @@ def upload_file():
                     }
                     
                     const result = await response.text();
-                    document.documentElement.innerHTML = result;
+                    
+                    // Parse the response to extract just the result
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(result, 'text/html');
+                    const resultText = doc.querySelector('#result')?.textContent;
+                    
+                    if (resultText) {
+                        // Create and show popup with result
+                        const popupHTML = `
+                            <div id="popup" class="popup show">
+                                <div class="popup-header">
+                                    <span>Result</span>
+                                    <button class="close-btn" onclick="closePopup()">×</button>
+                                </div>
+                                <pre id="result">${resultText}</pre>
+                            </div>`;
+                        
+                        // Remove existing popup if any
+                        const existingPopup = document.getElementById('popup');
+                        if (existingPopup) {
+                            existingPopup.remove();
+                        }
+                        
+                        // Add new popup
+                        document.body.insertAdjacentHTML('beforeend', popupHTML);
+                    }
+                    
                 } catch (error) {
                     console.error('Error:', error);
                     alert('Error uploading recording: ' + error.message);
@@ -513,14 +537,35 @@ def upload_file():
                 recordingTimerDisplay.textContent = "00:00";
                 recordButton.disabled = false;
                 stopButton.disabled = true;
+                analyzeButton.disabled = true;
 
+                if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                    mediaRecorder.stop();
+                }
+
+                // Stop all tracks in the current stream
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                    currentStream = null;
+                }
+
+                // Clear audio chunks
+                audioChunks = [];
+
+                // Reset audio context and related objects
                 if (audioContext && audioContext.state !== 'closed') {
-                audioStream?.disconnect();
-                gainNode?.disconnect();
-                mediaStreamDestination?.disconnect();
-    }
-            }
+                    audioStream?.disconnect();
+                    gainNode?.disconnect();
+                    mediaStreamDestination?.disconnect();
+                    audioContext.close();
+                }
 
+                audioContext = null;
+                audioStream = null;
+                gainNode = null;
+                mediaStreamDestination = null;
+                mediaRecorder = null;
+            }
 
             recordButton.addEventListener("click", async () => {
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -529,7 +574,6 @@ def upload_file():
                 }
 
                 try {
-                    // Ensure any old streams are stopped
                     resetRecorder();
 
                     const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -567,7 +611,7 @@ def upload_file():
                             return;
                         }
 
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/mp4' });
                         const audioURL = URL.createObjectURL(audioBlob);
                         audioPlayback.src = audioURL;
 
@@ -593,11 +637,9 @@ def upload_file():
 
                     recordingTimer = setInterval(() => {
                         secondsElapsed++;
-                        if (recordingTimerDisplay) {
-                            const minutes = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
-                            const seconds = String(secondsElapsed % 60).padStart(2, "0");
-                            recordingTimerDisplay.textContent = `${minutes}:${seconds}`;
-                        }
+                        const minutes = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
+                        const seconds = String(secondsElapsed % 60).padStart(2, "0");
+                        recordingTimerDisplay.textContent = `${minutes}:${seconds}`;
 
                         if (secondsElapsed >= 30) {
                             mediaRecorder.stop();
@@ -610,7 +652,6 @@ def upload_file():
                 }
             });
 
-
             stopButton.addEventListener("click", () => {
                 if (mediaRecorder && mediaRecorder.state === "recording") {
                     if (secondsElapsed < 10) {
@@ -620,19 +661,19 @@ def upload_file():
                     mediaRecorder.stop();
                 }
             });
-
             
-
             function closePopup() {
                 const popup = document.getElementById('popup');
-                const overlay = document.getElementById('overlay');
-                if (popup) popup.classList.add('hide');
-                if (popup) popup.classList.remove('show');
-                if (overlay) overlay.classList.remove('show');
+                if (popup) {
+                    popup.classList.add('hide');
+                    popup.classList.remove('show');
+                }
+                resetRecorder();
             }
         </script>
     </body>
     </html>
+    
     """
 
     def convert_to_wav(audio_binary):
