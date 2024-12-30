@@ -99,7 +99,6 @@ async def async_predict(frames, sample_rate, model, batch_size=32):
 
     return predictions
 
-# Analyze snore consistency
 def analyze_snore_consistency(audio, sample_rate, model, frame_duration=0.4, frame_overlap=0.2, max_gap_threshold=4.0):
     frame_size = int(frame_duration * sample_rate)
     hop_size = int(frame_size * (1 - frame_overlap))
@@ -135,7 +134,7 @@ def calculate_snore_index(intensity, frequency):
 def classify_snore_index(snore_index):
     if snore_index < 10.33:
         return "Mild"
-    elif snore_index < 27:
+    elif snore_index < 30:
         return "Moderate"
     else:
         return "Extreme"
@@ -144,24 +143,20 @@ def analyze_audio_directly(audio_binary):
     print(type(audio_binary), "analyse_audio_directly")
     try:
         audio_buffer = io.BytesIO(audio_binary)
-        audio, sample_rate = librosa.load(audio_buffer)
+        audio, sample_rate = librosa.load(audio_buffer, res_type='kaiser_fast')
             
         if audio.dtype != np.float32:
             audio = audio.astype(np.float32) / np.iinfo(audio.dtype).max
-            
-
+        
         if len(audio.shape) > 1:
             audio = np.mean(audio, axis=1)
         
-        
-        # Ensure audio length is within acceptable range (10-30 seconds)
         duration = len(audio) / sample_rate
         if duration < 10.0:
             return "Error: Audio length must be at least 10 seconds."
         if duration > 30.0:
             return "Error: Audio length must not exceed 30 seconds."
 
-        # Extract features and analyze
         mfccs_features = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=30)
         delta_mfcc = librosa.feature.delta(mfccs_features)
         delta2_mfcc = librosa.feature.delta(mfccs_features, order=2)
@@ -175,36 +170,31 @@ def analyze_audio_directly(audio_binary):
         if prediction_class == "Snoring":
             prediction_class = "Male-snoring"
 
-        # Initialize base result dictionary
         result = {
             'classification': prediction_class,
             'audio_data': audio_binary
         }
 
         if prediction_class != 'No-snoring':
-            # Calculate intensity
             rmse = librosa.feature.rms(y=audio)
             rmse_db = librosa.amplitude_to_db(rmse, ref=np.max)
             average_intensity = np.mean(rmse_db)
             target_dB = 60
             intensity = average_intensity + target_dB
 
-            # Calculate frequency
             stft = np.abs(librosa.stft(audio))
             freqs = librosa.fft_frequencies(sr=sample_rate)
             power_spectrum = np.sum(stft ** 2, axis=1)
             frequency = freqs[np.argmax(power_spectrum)]
 
-            # Calculate additional metrics
             snore_index = calculate_snore_index(intensity, frequency)
             severity = classify_snore_index(snore_index)
             consistency = analyze_snore_consistency(audio, sample_rate, model)
 
-            # Add additional metrics to result
             result.update({
                 'intensity': round(intensity, 2),
                 'frequency': round(frequency, 2),
-                'snore_index': severity,
+                'snore_index': severity+ f" {snore_index}",
                 'consistency': consistency
             })
 
@@ -617,10 +607,6 @@ def upload_file():
                             recordButton.disabled = false;
 
                             console.log("Audio file created:");
-                            console.log(` - Name: ${audioFile.name}`);
-                            console.log(` - Type: ${audioFile.type}`);
-                            console.log(` - Size: ${audioFile.size} bytes`);
-                            console.log(` - Last Modified: ${new Date(audioFile.lastModified).toLocaleString()}`);
                         };
 
                         mediaRecorder.start();
@@ -655,7 +641,6 @@ def upload_file():
                     }
                 });
 
-                
                 function closePopup() {
                     const popup = document.getElementById('popup');
                     if (popup) {
@@ -727,8 +712,13 @@ def upload_file():
                     consistency=result.get('consistency', 'N/A')
                 )
                 
+
+                display_result = "\n"     
+                if result['classification'] == 'No-snoring':
+                    display_result = f"Classification: {result['classification']}\n"
                 
-                display_result = f"Classification: {result['classification']}\n"                
+                
+                # display_result = f"Classification: {result['classification']}\n"
                 if 'intensity' in result:
                     display_result += f"Intensity (dB): {result['intensity']}\n"
                     display_result += f"Frequency (Hz): {result['frequency']}\n"
