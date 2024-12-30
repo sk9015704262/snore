@@ -144,14 +144,8 @@ def classify_snore_index(snore_index):
 def analyze_audio_directly(audio_binary):
     print(type(audio_binary), "analyse_audio_directly")
     try:
-        # Try loading with scipy first
-        try:
-            audio_buffer = io.BytesIO(audio_binary)
-            sample_rate, audio = wavfile.read(audio_buffer)
-        except Exception as e:
-            # If scipy fails, try librosa as fallback
-            audio_buffer = io.BytesIO(audio_binary)
-            audio, sample_rate = librosa.load(audio_buffer, sr=None)
+        audio_buffer = io.BytesIO(audio_binary)
+        audio, sample_rate = librosa.load(audio_buffer, res_type='kaiser_fast')
             
         # Convert to float32 if needed
         if audio.dtype != np.float32:
@@ -161,8 +155,6 @@ def analyze_audio_directly(audio_binary):
         if len(audio.shape) > 1:
             audio = np.mean(audio, axis=1)
         
-        gain = 4.0
-        audio = np.clip(audio * gain, -1.0, 1.0)
         
         # Ensure audio length is within acceptable range (10-30 seconds)
         duration = len(audio) / sample_rate
@@ -437,19 +429,11 @@ def upload_file():
         <h3>Note: <span style="font-size: 0.9em; font-weight: normal;">Audio should be between 10 to 30 seconds long for accurate analysis.</span></h3>
         <div class="container">
             <div class="section">
-                <h2>Upload Audio</h2>
-                <form method="POST" enctype="multipart/form-data" onsubmit="document.getElementById('loader').style.display='block';">
-                    <input type="file" name="audiofile" accept="audio/*">
-                    <button type="submit">Upload and Analyze</button>
-                </form>
-            </div>
-
-            <div class="section">
                 <h2>Record Audio</h2>
                 <button id="record-btn">Start Recording</button>
                 <button id="stop-btn" disabled>Stop Recording</button>
                 <p>Recording Duration: <span id="recording-timer">00:00</span></p>
-                <audio id="audio-playback" controls></audio>
+                <audio id="audio-playback" style="display:none" controls></audio>
                 <form id="recording-form" method="POST" enctype="multipart/form-data">
                     <button type="submit" id="analyze-btn" disabled>Analyze Recording</button>
                 </form>
@@ -586,11 +570,7 @@ def upload_file():
                         resetRecorder();
 
                         const stream = await navigator.mediaDevices.getUserMedia({ 
-                            audio: {
-                                autoGainControl: false,
-                                noiseSuppression: false,
-                                channelCount: 2
-                            }  
+                            audio: {}
                         });
 
                         currentStream = stream; 
@@ -598,7 +578,7 @@ def upload_file():
                         audioStream = audioContext.createMediaStreamSource(stream);
                         gainNode = audioContext.createGain();
                         mediaStreamDestination = audioContext.createMediaStreamDestination();
-                        gainNode.gain.value = 4.0;
+                        gainNode.gain.value = 1.0;
 
                         audioStream.connect(gainNode);
                         gainNode.connect(mediaStreamDestination);
@@ -609,7 +589,6 @@ def upload_file():
                             audioChunks.push(event.data);
                             console.log(event.data, "Type of Recoreded Audio file")
                         };
-
 
                         mediaRecorder.onstop = async () => {
                             clearInterval(recordingTimer);
@@ -668,14 +647,16 @@ def upload_file():
                 });
 
                 stopButton.addEventListener("click", () => {
+                    console.log("Stop button clicked. Stopping recording...");
                     if (mediaRecorder && mediaRecorder.state === "recording") {
-                        if (secondsElapsed < 10) {
-                            alert("Recording must be at least 10 seconds long. Please continue recording.");
-                            return;
-                        }
                         mediaRecorder.stop();
+                        clearInterval(recordingTimer);
+                        stopButton.disabled = true;
+                    } else {
+                        console.warn("MediaRecorder is not in a recording state.");
                     }
                 });
+
                 
                 function closePopup() {
                     const popup = document.getElementById('popup');
@@ -716,6 +697,7 @@ def upload_file():
             
             try:
                 audio = AudioSegment.from_file(io.BytesIO(audio_binary))
+                audio = audio.set_frame_rate(16000)
                 
                 # Apply gain (4.0 = +12dB)
                 audio = audio + 12
@@ -748,12 +730,7 @@ def upload_file():
                 )
                 
                 
-                display_result = f""
-                # Format result for display
-                if result['classification'] == "No-snoring":
-                    display_result = f"Classification: {result['classification']}\n"
-
-                
+                display_result = f"Classification: {result['classification']}\n"                
                 if 'intensity' in result:
                     display_result += f"Intensity (dB): {result['intensity']}\n"
                     display_result += f"Frequency (Hz): {result['frequency']}\n"
