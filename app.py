@@ -194,7 +194,7 @@ def analyze_audio_directly(audio_binary):
             result.update({
                 'intensity': round(intensity, 2),
                 'frequency': round(frequency, 2),
-                'snore_index': severity+ f" {snore_index}",
+                'snore_index': severity,
                 'consistency': consistency
             })
 
