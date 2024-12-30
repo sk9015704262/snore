@@ -140,18 +140,16 @@ def classify_snore_index(snore_index):
     else:
         return "Extreme"
 
-
 def analyze_audio_directly(audio_binary):
     print(type(audio_binary), "analyse_audio_directly")
     try:
         audio_buffer = io.BytesIO(audio_binary)
-        audio, sample_rate = librosa.load(audio_buffer, res_type='kaiser_fast')
+        audio, sample_rate = librosa.load(audio_buffer)
             
-        # Convert to float32 if needed
         if audio.dtype != np.float32:
             audio = audio.astype(np.float32) / np.iinfo(audio.dtype).max
             
-        # If stereo, convert to mono
+
         if len(audio.shape) > 1:
             audio = np.mean(audio, axis=1)
         
