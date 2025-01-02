@@ -61,3 +61,4 @@ wheel==0.45.1
 wrapt==1.17.0
 werkzeug>=2.0.0
 resampy==0.4.3
+pandas==2.2.3

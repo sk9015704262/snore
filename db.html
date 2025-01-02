@@ -114,31 +114,32 @@
 
         function fetchData() {
             fetch('/get_database_data')
-                .then(response => response.json())
-                .then(data => {
-                    const tableBody = document.getElementById('tableBody');
-                    tableBody.innerHTML = '';
+            .then(response => response.json())
+            .then(data => {
+                console.log('Received data:', data); // Add this line
+                const tableBody = document.getElementById('tableBody');
+                tableBody.innerHTML = '';
 
-                    data.forEach(row => {
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td>${row.id}</td>
-                            <td><a href="/saved_uploads/${row.file_name}" class="audio-link" target="_blank">${row.file_name}</a></td>
-                            <td>${row.classification}</td>
-                            <td>${row.intensity !== null ? row.intensity.toFixed(2) : 'N/A'}</td>
-                            <td>${row.frequency !== null ? row.frequency.toFixed(2) : 'N/A'}</td>
-                            <td>${row.snore_index || 'N/A'}</td>
-                            <td>${row.consistency || 'N/A'}</td>
-
-                        `;
-                        tableBody.appendChild(tr);
-                    });
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('tableContainer').innerHTML = 
-                        `<div class="error">Error loading data: ${error.message}</div>`;
+                data.forEach(row => { // This will fail if `data` is not an array
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.id}</td>
+                        <td><a href="/saved_uploads/${row.file_name}" class="audio-link" target="_blank">${row.file_name}</a></td>
+                        <td>${row.classification}</td>
+                        <td>${row.intensity !== null ? row.intensity.toFixed(2) : 'N/A'}</td>
+                        <td>${row.frequency !== null ? row.frequency.toFixed(2) : 'N/A'}</td>
+                        <td>${row.snore_index || 'N/A'}</td>
+                        <td>${row.consistency || 'N/A'}</td>
+                    `;
+                    tableBody.appendChild(tr);
                 });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('tableContainer').innerHTML = 
+                    `<div class="error">Error loading data: ${error.message}</div>`;
+            });
+
         }
 
         function downloadCSV() {
