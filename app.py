@@ -54,7 +54,7 @@ def save_prediction_to_db(file_name, classification, intensity, frequency, snore
         sql = """
         INSERT INTO snoring_predictions 
         (file_name, classification, intensity, frequency, snore_index, consistency)
-        VALUES (?, ?, ?, ?, ?, ?);
+        VALUES (?, ?, ?, ?, ?, ?, ?);
         """
         cursor.execute(sql, (file_name, classification, intensity, frequency, snore_index, consistency))
         # cursor.execute("SELECT * FROM snoring_predictions")
@@ -191,12 +191,13 @@ def analyze_audio_directly(audio_binary):
             snore_index = calculate_snore_index(intensity, frequency)
             severity = classify_snore_index(snore_index)
             consistency = analyze_snore_consistency(audio, sample_rate, model)
+            device = detect_os()
 
             result.update({
                 'intensity': round(intensity, 2),
                 'frequency': round(frequency, 2),
                 'snore_index': severity,
-                'consistency': consistency
+                'consistency': consistency,
             })
 
         return result
@@ -221,22 +222,11 @@ os.makedirs(SAVED_FOLDER, exist_ok=True)
 @app.route('/download_csv')
 def download_csv():
     try:
-        # Connect to your SQLite database
         conn = sqlite3.connect(DB_PATH)
-        
-        # Query to get all data from your table
-        query = "SELECT * FROM snoring_predictions"  # Replace 'snoring_data' with your table name
-        
-        # Read data into pandas DataFrame
+        query = "SELECT * FROM snoring_predictions"  
         df = pd.read_sql_query(query, conn)
-        
-        # Create an in-memory string buffer
         buffer = io.StringIO()
-        
-        # Write DataFrame to CSV in the buffer
         df.to_csv(buffer, index=False)
-        
-        # Create the response
         buffer.seek(0)
         
         return send_file(
@@ -250,7 +240,6 @@ def download_csv():
         return str(e), 500
     finally:
         conn.close()
-
 
 
 @app.route('/get_database_data')
@@ -778,7 +767,7 @@ def upload_file():
                     intensity=result.get('intensity'),
                     frequency=result.get('frequency'),
                     snore_index=result.get('snore_index', 'N/A'),
-                    consistency=result.get('consistency', 'N/A')
+                    consistency=result.get('consistency', 'N/A'),
                 )
                 
 

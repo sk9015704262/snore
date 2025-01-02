@@ -99,6 +99,7 @@
                         <th>Frequency</th>
                         <th>Snore Index</th>
                         <th>Consistency</th>
+
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -128,6 +129,7 @@
                             <td>${row.frequency !== null ? row.frequency.toFixed(2) : 'N/A'}</td>
                             <td>${row.snore_index || 'N/A'}</td>
                             <td>${row.consistency || 'N/A'}</td>
+
                         `;
                         tableBody.appendChild(tr);
                     });
