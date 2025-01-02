@@ -54,7 +54,7 @@ def save_prediction_to_db(file_name, classification, intensity, frequency, snore
         sql = """
         INSERT INTO snoring_predictions 
         (file_name, classification, intensity, frequency, snore_index, consistency)
-        VALUES (?, ?, ?, ?, ?, ?, ?);
+        VALUES (?, ?, ?, ?, ?, ?);
         """
         cursor.execute(sql, (file_name, classification, intensity, frequency, snore_index, consistency))
         # cursor.execute("SELECT * FROM snoring_predictions")
@@ -191,7 +191,6 @@ def analyze_audio_directly(audio_binary):
             snore_index = calculate_snore_index(intensity, frequency)
             severity = classify_snore_index(snore_index)
             consistency = analyze_snore_consistency(audio, sample_rate, model)
-            device = detect_os()
 
             result.update({
                 'intensity': round(intensity, 2),

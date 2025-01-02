@@ -143,7 +143,6 @@
         }
 
         function downloadCSV() {
-            // Show loading indicator if you want
             const downloadBtn = document.querySelector('.download-btn');
             downloadBtn.textContent = 'Downloading...';
             downloadBtn.disabled = true;
@@ -156,7 +155,6 @@
                     return response.blob();
                 })
                 .then(blob => {
-                    // Create a link to download the file
                     const url = window.URL.createObjectURL(blob);
                     const link = document.createElement('a');
                     link.href = url;
@@ -164,16 +162,13 @@
                     document.body.appendChild(link);
                     link.click();
                     link.parentNode.removeChild(link);
-                    
-                    // Reset button state
                     downloadBtn.textContent = 'Download CSV';
                     downloadBtn.disabled = false;
                 })
                 .catch(error => {
                     console.error('Error:', error);
                     alert('Error downloading CSV file');
-                    
-                    // Reset button state
+
                     downloadBtn.textContent = 'Download CSV';
                     downloadBtn.disabled = false;
                 });
@@ -188,9 +183,6 @@
                 row.style.display = rowText.includes(searchInput) ? '' : 'none';
             });
         }
-
-
-        // Load data when page loads
         document.addEventListener('DOMContentLoaded', fetchData);
     </script>
     </script>
