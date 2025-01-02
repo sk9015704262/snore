@@ -9,7 +9,7 @@ import datetime
 from pydub import AudioSegment
 import soundfile as sf
 from scipy.io import wavfile
-from flask import Flask, request, render_template_string
+from flask import Flask, request, render_template_string, send_file, jsonify, send_from_directory
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.models import load_model
@@ -25,7 +25,7 @@ labelencoder = LabelEncoder()
 labelencoder.fit(classes)
 
 # Load model
-model_path = 'saved_models/audio_classification18_90(1).keras'
+model_path = 'saved_models/audio_classification18_90(2).keras'
 model = load_model(model_path)
 
 
@@ -134,7 +134,7 @@ def calculate_snore_index(intensity, frequency):
 def classify_snore_index(snore_index):
     if snore_index < 10.33:
         return "Mild"
-    elif snore_index < 30:
+    elif snore_index < 31:
         return "Moderate"
     else:
         return "Extreme"
@@ -216,6 +216,43 @@ SAVED_FOLDER = 'saved_uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(SAVED_FOLDER, exist_ok=True)
 
+
+
+
+@app.route('/get_database_data')
+def get_database_data():
+    try:
+        connection = sqlite3.connect(DB_PATH)
+        cursor = connection.cursor()
+        cursor.execute("SELECT * FROM snoring_predictions ORDER BY id DESC")
+        data = cursor.fetchall()
+        
+        # Get column names
+        cursor.execute("PRAGMA table_info(snoring_predictions)")
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        # Convert to list of dictionaries
+        results = []
+        for row in data:
+            results.append(dict(zip(columns, row)))
+            
+        return jsonify(results)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        connection.close()
+
+@app.route('/saved_uploads/<filename>')
+def serve_audio(filename):
+    return send_from_directory('saved_uploads', filename)
+
+# Add this route to serve db.html
+@app.route('/db.html')
+def database_page():
+    try:
+        return send_file('db.html')
+    except Exception as e:
+        return f"Error loading database page: {str(e)}", 500
 
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
@@ -440,6 +477,7 @@ def upload_file():
         <pre id="result" class="hide"></pre>
 
             <script>
+                
                 let mediaRecorder;
                 let audioChunks = [];
                 let recordingTimer;
@@ -521,17 +559,14 @@ def upload_file():
                         mediaRecorder.stop();
                     }
 
-                    // Stop all tracks in the current stream
                     if (currentStream) {
                         console.log("Stopping all audio tracks...");
                         currentStream.getTracks().forEach(track => track.stop());
                         currentStream = null;
                     }
 
-                    // Clear audio chunks
                     audioChunks = [];
 
-                    // Reset audio context and related objects
                     if (audioContext && audioContext.state !== 'closed') {
                         console.log("Closing audio context...");
                         audioStream?.disconnect();
@@ -566,7 +601,7 @@ def upload_file():
                         audioStream = audioContext.createMediaStreamSource(stream);
                         gainNode = audioContext.createGain();
                         mediaStreamDestination = audioContext.createMediaStreamDestination();
-                        gainNode.gain.value = 1.0;
+                        gainNode.gain.value = 0.5;
 
                         audioStream.connect(gainNode);
                         gainNode.connect(mediaStreamDestination);

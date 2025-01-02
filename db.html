@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snoring Detection Database</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: white;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #495057;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        .refresh-btn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .refresh-btn:hover {
+            background-color: #0056b3;
+        }
+        .error {
+            color: red;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Snoring Detection Database</h1>
+        <button class="refresh-btn" onclick="fetchData()">Refresh Data</button>
+        <div id="tableContainer">
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>File Name</th>
+                        <th>Classification</th>
+                        <th>Intensity</th>
+                        <th>Frequency</th>
+                        <th>Snore Index</th>
+                        <th>Consistency</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <!-- Data will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function fetchData() {
+            fetch('/get_database_data')
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.getElementById('tableBody');
+                    tableBody.innerHTML = '';
+
+                    data.forEach(row => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${row.id}</td>
+                            <td><a href="/saved_uploads/${row.file_name}" class="audio-link" target="_blank">${row.file_name}</a></td>
+                            <td>${row.classification}</td>
+                            <td>${row.intensity !== null ? row.intensity.toFixed(2) : 'N/A'}</td>
+                            <td>${row.frequency !== null ? row.frequency.toFixed(2) : 'N/A'}</td>
+                            <td>${row.snore_index || 'N/A'}</td>
+                            <td>${row.consistency || 'N/A'}</td>
+                        `;
+                        tableBody.appendChild(tr);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('tableContainer').innerHTML = 
+                        `<div class="error">Error loading data: ${error.message}</div>`;
+                });
+        }
+
+        // Load data when page loads
+        document.addEventListener('DOMContentLoaded', fetchData);
+    </script>
+    </script>
+</body>
+</html>
+
