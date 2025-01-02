@@ -7,6 +7,7 @@ import sqlite3
 import io
 import datetime
 from pydub import AudioSegment
+import pandas as pd
 import soundfile as sf
 from scipy.io import wavfile
 from flask import Flask, request, render_template_string, send_file, jsonify, send_from_directory
@@ -216,6 +217,39 @@ SAVED_FOLDER = 'saved_uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(SAVED_FOLDER, exist_ok=True)
 
+
+@app.route('/download_csv')
+def download_csv():
+    try:
+        # Connect to your SQLite database
+        conn = sqlite3.connect(DB_PATH)
+        
+        # Query to get all data from your table
+        query = "SELECT * FROM snoring_predictions"  # Replace 'snoring_data' with your table name
+        
+        # Read data into pandas DataFrame
+        df = pd.read_sql_query(query, conn)
+        
+        # Create an in-memory string buffer
+        buffer = io.StringIO()
+        
+        # Write DataFrame to CSV in the buffer
+        df.to_csv(buffer, index=False)
+        
+        # Create the response
+        buffer.seek(0)
+        
+        return send_file(
+            io.BytesIO(buffer.getvalue().encode()),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name='complete_snoring_data.csv'
+        )
+    
+    except Exception as e:
+        return str(e), 500
+    finally:
+        conn.close()
 
 
 
