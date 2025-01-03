@@ -258,7 +258,7 @@ def get_database_data():
         for row in data:
             results.append(dict(zip(columns, row)))
             
-        return jsonify(results)
+        return jsonify({"data": results})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
@@ -775,7 +775,7 @@ def upload_file():
                     display_result = f"Classification: {result['classification']}\n"
                 
                 
-                # display_result = f"Classification: {result['classification']}\n"
+                # display_result = f"Classification: {result['classification']}\n"  
                 if 'intensity' in result:
                     display_result += f"Intensity (dB): {result['intensity']}\n"
                     display_result += f"Frequency (Hz): {result['frequency']}\n"
