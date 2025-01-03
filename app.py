@@ -246,33 +246,23 @@ def get_database_data():
     try:
         connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
+        cursor.execute("SELECT * FROM snoring_predictions ORDER BY id DESC")
+        data = cursor.fetchall()
         
-        # Get column names first
+        # Get column names
         cursor.execute("PRAGMA table_info(snoring_predictions)")
         columns = [col[1] for col in cursor.fetchall()]
         
-        # Get the data
-        cursor.execute("SELECT * FROM snoring_predictions ORDER BY id DESC")
-        rows = cursor.fetchall()
-        
         # Convert to list of dictionaries
         results = []
-        for row in rows:
-            row_dict = dict(zip(columns, row))
-            # Convert numeric values to proper format
-            for key in ['intensity', 'frequency']:
-                if key in row_dict and row_dict[key] is not None:
-                    row_dict[key] = float(row_dict[key])
-            results.append(row_dict)
-        
+        for row in data:
+            results.append(dict(zip(columns, row)))
+            
         return jsonify({"data": results})
-        
     except Exception as e:
-        print(f"Error in get_database_data: {str(e)}")  # Debug print
-        return jsonify({"error": str(e), "data": []}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
-        if connection:
-            connection.close()
+        connection.close()
 
 @app.route('/saved_uploads/<filename>')
 def serve_audio(filename):
@@ -772,7 +762,7 @@ def upload_file():
                 # Save to database
                 save_prediction_to_db(
                     file_name=filename,
-                    classification=result['classification'],
+                    classification=result.get['classification'],
                     intensity=result.get('intensity'),
                     frequency=result.get('frequency'),
                     snore_index=result.get('snore_index', 'N/A'),
