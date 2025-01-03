@@ -99,6 +99,7 @@
                         <th>Frequency</th>
                         <th>Snore Index</th>
                         <th>Consistency</th>
+                        <th>Device OS</th>
 
                     </tr>
                 </thead>
@@ -110,6 +111,17 @@
     </div>
 
     <script>
+        function getOS() {
+            const userAgent = window.navigator.userAgent.toLowerCase();
+            const platform = window.navigator.platform.toLowerCase();
+
+            if (userAgent.includes("android")) return "Android";
+            if (userAgent.includes("ios") || platform.includes('iphone') || platform.includes('ipad') || platform.includes('ipod')) return "iOS";
+            if (userAgent.includes("win") || platform.includes("win")) return "Windows";
+            if (userAgent.includes("mac") || platform.includes("mac")) return "MacOS";
+
+            return "Unknown OS";
+        }
         let currentData = [];
 
         function fetchData() {
@@ -140,13 +152,14 @@
                         throw new Error(`Expected array but got ${typeof data}: ${JSON.stringify(data)}`);
                     }
 
+                    const deviceOS = getOS();
                     data.forEach(row => {
 
                         if (!row) {
                             console.warn('Empty row data encountered');
                             return;
                         }
-
+                        
                         const tr = document.createElement('tr');
                         try {
                             tr.innerHTML = `
@@ -157,6 +170,7 @@
                                 <td>${typeof row.frequency === 'number' && isFinite(row.frequency) ? Number(row.frequency).toFixed(2) : 'N/A'}</td>
                                 <td>${row.snore_index ?? 'N/A'}</td>
                                 <td>${row.consistency ?? 'N/A'}</td>
+                                <td>${row.device_os ?? deviceOS}</td>
                             `;
                             tableBody.appendChild(tr);
                         } catch (rowError) {
