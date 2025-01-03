@@ -37,7 +37,7 @@ def save_prediction_to_db(file_name, classification, intensity, frequency, snore
         # Connect to SQLite3 database
         connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
-        print(file_name, classification, intensity, frequency, snore_index, consistency)
+        print(type(file_name), type(classification), type(intensity), type(frequency), type(snore_index), type(consistency))
         
         # Ensure the table exists
         cursor.execute("""
@@ -243,11 +243,15 @@ def download_csv():
         conn.close()
 
 
+import numpy
+
 @app.route('/get_database_data')
 def get_database_data():
     try:
         connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
+        
+        # Fetch data from the database
         cursor.execute("SELECT * FROM snoring_predictions ORDER BY id DESC")
         data = cursor.fetchall()
         
@@ -258,13 +262,27 @@ def get_database_data():
         # Convert to list of dictionaries
         results = []
         for row in data:
-            results.append(dict(zip(columns, row)))
-            
+            row_dict = {}
+            for col_name, value in zip(columns, row):
+                # Handle numpy data types
+                if isinstance(value, numpy.str_):  # Convert numpy strings to Python strings
+                    row_dict[col_name] = str(value)
+                elif isinstance(value, numpy.float64):  # Convert numpy floats to Python floats
+                    row_dict[col_name] = float(value)
+                elif isinstance(value, bytes):  # Decode bytes to string
+                    row_dict[col_name] = value.decode('utf-8', errors='replace')
+                elif value is None:  # Handle NoneType explicitly
+                    row_dict[col_name] = None
+                else:  # For native Python types, use as is
+                    row_dict[col_name] = value
+            results.append(row_dict)
+        
         return jsonify({"data": results})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
         connection.close()
+
 
 @app.route('/saved_uploads/<filename>')
 def serve_audio(filename):
