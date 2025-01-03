@@ -250,8 +250,6 @@ def get_database_data():
     try:
         connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
-        
-        # Fetch data from the database
         cursor.execute("SELECT * FROM snoring_predictions ORDER BY id DESC")
         data = cursor.fetchall()
         
@@ -262,32 +260,9 @@ def get_database_data():
         # Convert to list of dictionaries
         results = []
         for row in data:
-            row_dict = {}
-            for col_name, value in zip(columns, row):
-                # Handle numpy data types
-                if isinstance(value, numpy.str_):  # Convert numpy strings to Python strings
-                    row_dict[col_name] = str(value)
-                elif isinstance(value, numpy.float64):  # Convert numpy floats to Python floats
-                    row_dict[col_name] = float(value)
-                elif isinstance(value, bytes):  # Decode bytes to string or handle as needed
-                    try:
-                        row_dict[col_name] = value.decode('utf-8', errors='replace')
-                    except UnicodeDecodeError:
-                        row_dict[col_name] = str(value)  # Fallback to string representation
-                elif value is None:  # Handle NoneType explicitly
-                    row_dict[col_name] = None
-                elif col_name == "intensity" and isinstance(value, str):  # Handle string intensity
-                    try:
-                        # Attempt to parse as a float
-                        row_dict[col_name] = float(value)
-                    except ValueError:
-                        # Leave as-is or log an error
-                        row_dict[col_name] = "Invalid Data"
-                else:  # For native Python types, use as is
-                    row_dict[col_name] = value
-            results.append(row_dict)
-        
-        return jsonify({"data": results})
+            results.append(dict(zip(columns, row)))
+            
+        return jsonify(results)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
