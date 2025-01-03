@@ -137,7 +137,7 @@
                         tr.innerHTML = `
                             <td>${row.id || ''}</td>
                             <td><a href="/saved_uploads/${row.file_name || ''}" class="audio-link" target="_blank">${row.file_name || ''}</a></td>
-                            <td>${row.classification || ''}</td>
+                            <td>${row.classification || 'No-Snoring'}</td>
                             <td>${row.intensity !== null ? Number(row.intensity).toFixed(2) : 'N/A'}</td>
                             <td>${row.frequency !== null ? Number(row.frequency).toFixed(2) : 'N/A'}</td>
                             <td>${row.snore_index || 'N/A'}</td>
