@@ -243,13 +243,13 @@ def download_csv():
         conn.close()
 
 
-import numpy
-
 @app.route('/get_database_data')
 def get_database_data():
     try:
         connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
+        
+        # Fetch data from the database
         cursor.execute("SELECT * FROM snoring_predictions ORDER BY id DESC")
         data = cursor.fetchall()
         
@@ -257,18 +257,23 @@ def get_database_data():
         cursor.execute("PRAGMA table_info(snoring_predictions)")
         columns = [col[1] for col in cursor.fetchall()]
         
-        # Convert to list of dictionaries
+        # Convert to list of dictionaries, handling bytes
         results = []
         for row in data:
-            results.append(dict(zip(columns, row)))
-            
-        return jsonify(results)
+            row_dict = {}
+            for col_name, value in zip(columns, row):
+                # Convert bytes to a string (e.g., decode if it's text data)
+                if isinstance(value, bytes):
+                    row_dict[col_name] = value.decode('utf-8', errors='replace')  # Adjust encoding if needed
+                else:
+                    row_dict[col_name] = value
+            results.append(row_dict)
+        
+        return jsonify({"data": results})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
         connection.close()
-
-
 
 @app.route('/saved_uploads/<filename>')
 def serve_audio(filename):

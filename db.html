@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -71,6 +71,15 @@
             text-align: center;
             padding: 20px;
         }
+        .search-bar {
+            margin-left: 20px;
+            padding: 10px;
+            width: 300px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
     </style>
 </head>
 <body>
@@ -90,41 +99,86 @@
                         <th>Frequency</th>
                         <th>Snore Index</th>
                         <th>Consistency</th>
+
                     </tr>
                 </thead>
                 <tbody id="tableBody">
-                    <!-- Data will be inserted here -->
+
                 </tbody>
             </table>
         </div>
     </div>
+
     <script>
+        let currentData = [];
+
         function fetchData() {
             fetch('/get_database_data')
-                .then(response => response.json())
-                .then(data => {
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(response => {
+                    console.log('Full response:', response); // Log the entire response
+                    
+                    if (!response || !response.data) {
+                        throw new Error('Invalid response format: missing data property');
+                    }
+                    
+                    const data = response.data;
                     const tableBody = document.getElementById('tableBody');
+                    
+                    if (!tableBody) {
+                        throw new Error('Table body element not found');
+                    }
+                    
                     tableBody.innerHTML = '';
+
+                    if (!Array.isArray(data)) {
+                        throw new Error(`Expected array but got ${typeof data}: ${JSON.stringify(data)}`);
+                    }
+
                     data.forEach(row => {
+
+                        if (!row) {
+                            console.warn('Empty row data encountered');
+                            return;
+                        }
+
                         const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td>${row.id}</td>
-                            <td><a href="/saved_uploads/${row.file_name}" class="audio-link" target="_blank">${row.file_name}</a></td>
-                            <td>${row.classification}</td>
-                            <td>${row.intensity !== null ? row.intensity.toFixed(2) : 'N/A'}</td>
-                            <td>${row.frequency !== null ? row.frequency.toFixed(2) : 'N/A'}</td>
-                            <td>${row.snore_index || 'N/A'}</td>
-                            <td>${row.consistency || 'N/A'}</td>
-                        `;
-                        tableBody.appendChild(tr);
+                        try {
+                            tr.innerHTML = `
+                                <td>${row.id ?? ''}</td>
+                                <td>${row.file_name ? `<a href="/saved_uploads/${row.file_name}" class="audio-link" target="_blank">${row.file_name}</a>` : ''}</td>
+                                <td>${row.classification ?? ''}</td>
+                                <td>${isFinite(row.intensity) ? Number(row.intensity).toFixed(2) : 'N/A'}</td>
+                                <td>${isFinite(row.frequency) ? Number(row.frequency).toFixed(2) : 'N/A'}</td>
+
+                                <td>${row.snore_index ?? 'N/A'}</td>
+                                <td>${row.consistency ?? 'N/A'}</td>
+                            `;
+                            tableBody.appendChild(tr);
+                        } catch (rowError) {
+                            console.error('Error creating row:', rowError, 'Row data:', row);
+                        }
                     });
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('tableContainer').innerHTML = 
-                        `<div class="error">Error loading data: ${error.message}</div>`;
+                    console.error('Error in fetchData:', error);
+                    const tableContainer = document.getElementById('tableContainer');
+                    if (tableContainer) {
+                        tableContainer.innerHTML = `<div class="error">Error loading data: ${error.message}</div>`;
+                    }
                 });
         }
+
+        // Add automatic refresh when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Page loaded, fetching initial data...');
+            fetchData();
+        });
 
         function downloadCSV() {
             const downloadBtn = document.querySelector('.download-btn');
@@ -167,7 +221,6 @@
                 row.style.display = rowText.includes(searchInput) ? '' : 'none';
             });
         }
-        // Load data when page loads
         document.addEventListener('DOMContentLoaded', fetchData);
     </script>
     </script>
