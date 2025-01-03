@@ -114,46 +114,70 @@
 
         function fetchData() {
             fetch('/get_database_data')
-                .then(response => response.json())
                 .then(response => {
-                    console.log('Received data:', response);
-                    const data = response.data; // Extract the data array
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(response => {
+                    console.log('Full response:', response); // Log the entire response
+                    
+                    if (!response || !response.data) {
+                        throw new Error('Invalid response format: missing data property');
+                    }
+                    
+                    const data = response.data;
                     const tableBody = document.getElementById('tableBody');
                     
                     if (!tableBody) {
-                        console.error('Table body element not found');
-                        return;
+                        throw new Error('Table body element not found');
                     }
                     
                     tableBody.innerHTML = '';
 
                     if (!Array.isArray(data)) {
-                        console.error('Data is not an array:', data);
-                        return;
+                        throw new Error(`Expected array but got ${typeof data}: ${JSON.stringify(data)}`);
                     }
 
                     data.forEach(row => {
+                        // Add error checking for row data
+                        if (!row) {
+                            console.warn('Empty row data encountered');
+                            return;
+                        }
+
                         const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td>${row.id || ''}</td>
-                            <td><a href="/saved_uploads/${row.file_name || ''}" class="audio-link" target="_blank">${row.file_name || ''}</a></td>
-                            <td>${row.classification || 'No-Snoring'}</td>
-                            <td>${row.intensity !== null ? Number(row.intensity).toFixed(2) : 'N/A'}</td>
-                            <td>${row.frequency !== null ? Number(row.frequency).toFixed(2) : 'N/A'}</td>
-                            <td>${row.snore_index || 'N/A'}</td>
-                            <td>${row.consistency || 'N/A'}</td>
-                        `;
-                        tableBody.appendChild(tr);
+                        try {
+                            tr.innerHTML = `
+                                <td>${row.id ?? ''}</td>
+                                <td>${row.file_name ? `<a href="/saved_uploads/${row.file_name}" class="audio-link" target="_blank">${row.file_name}</a>` : ''}</td>
+                                <td>${row.classification ?? ''}</td>
+                                <td>${row.intensity != null ? Number(row.intensity).toFixed(2) : 'N/A'}</td>
+                                <td>${row.frequency != null ? Number(row.frequency).toFixed(2) : 'N/A'}</td>
+                                <td>${row.snore_index ?? 'N/A'}</td>
+                                <td>${row.consistency ?? 'N/A'}</td>
+                            `;
+                            tableBody.appendChild(tr);
+                        } catch (rowError) {
+                            console.error('Error creating row:', rowError, 'Row data:', row);
+                        }
                     });
                 })
                 .catch(error => {
-                    console.error('Error:', error);
+                    console.error('Error in fetchData:', error);
                     const tableContainer = document.getElementById('tableContainer');
                     if (tableContainer) {
                         tableContainer.innerHTML = `<div class="error">Error loading data: ${error.message}</div>`;
                     }
                 });
         }
+
+        // Add automatic refresh when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Page loaded, fetching initial data...');
+            fetchData();
+        });
 
         function downloadCSV() {
             const downloadBtn = document.querySelector('.download-btn');

@@ -246,23 +246,33 @@ def get_database_data():
     try:
         connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
-        cursor.execute("SELECT * FROM snoring_predictions ORDER BY id DESC")
-        data = cursor.fetchall()
         
-        # Get column names
+        # Get column names first
         cursor.execute("PRAGMA table_info(snoring_predictions)")
         columns = [col[1] for col in cursor.fetchall()]
         
+        # Get the data
+        cursor.execute("SELECT * FROM snoring_predictions ORDER BY id DESC")
+        rows = cursor.fetchall()
+        
         # Convert to list of dictionaries
         results = []
-        for row in data:
-            results.append(dict(zip(columns, row)))
-            
+        for row in rows:
+            row_dict = dict(zip(columns, row))
+            # Convert numeric values to proper format
+            for key in ['intensity', 'frequency']:
+                if key in row_dict and row_dict[key] is not None:
+                    row_dict[key] = float(row_dict[key])
+            results.append(row_dict)
+        
         return jsonify({"data": results})
+        
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error in get_database_data: {str(e)}")  # Debug print
+        return jsonify({"error": str(e), "data": []}), 500
     finally:
-        connection.close()
+        if connection:
+            connection.close()
 
 @app.route('/saved_uploads/<filename>')
 def serve_audio(filename):
