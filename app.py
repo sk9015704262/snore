@@ -34,6 +34,9 @@ DB_PATH = 'snore_audio.db'
 
 def save_prediction_to_db(file_name, classification, intensity, frequency, snore_index, consistency):
     try:
+        intensity = float(intensity) if intensity is not None else None
+        frequency = float(frequency) if frequency is not None else None
+        
         # Connect to SQLite3 database
         connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
@@ -193,6 +196,7 @@ def analyze_audio_directly(audio_binary):
             snore_index = calculate_snore_index(intensity, frequency)
             severity = classify_snore_index(snore_index)
             consistency = analyze_snore_consistency(audio, sample_rate, model)
+            intensity = float(intensity)
 
             result.update({
                 'intensity': round(intensity, 2),

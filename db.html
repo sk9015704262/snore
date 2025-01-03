@@ -153,9 +153,8 @@
                                 <td>${row.id ?? ''}</td>
                                 <td>${row.file_name ? `<a href="/saved_uploads/${row.file_name}" class="audio-link" target="_blank">${row.file_name}</a>` : ''}</td>
                                 <td>${row.classification ?? ''}</td>
-                                <td>${isFinite(row.intensity) ? Number(row.intensity).toFixed(2) : 'N/A'}</td>
-                                <td>${isFinite(row.frequency) ? Number(row.frequency).toFixed(2) : 'N/A'}</td>
-
+                                <td>${typeof row.intensity === 'number' && isFinite(row.intensity) ? Number(row.intensity).toFixed(2) : 'N/A'}</td>
+                                <td>${typeof row.frequency === 'number' && isFinite(row.frequency) ? Number(row.frequency).toFixed(2) : 'N/A'}</td>
                                 <td>${row.snore_index ?? 'N/A'}</td>
                                 <td>${row.consistency ?? 'N/A'}</td>
                             `;
