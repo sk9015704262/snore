@@ -37,6 +37,7 @@ def save_prediction_to_db(file_name, classification, intensity, frequency, snore
         # Connect to SQLite3 database
         connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
+        print(file_name, classification, intensity, frequency, snore_index, consistency)
         
         # Ensure the table exists
         cursor.execute("""
@@ -50,6 +51,7 @@ def save_prediction_to_db(file_name, classification, intensity, frequency, snore
             consistency TEXT
         );
         """)
+        
         
         sql = """
         INSERT INTO snoring_predictions 
@@ -762,7 +764,7 @@ def upload_file():
                 # Save to database
                 save_prediction_to_db(
                     file_name=filename,
-                    classification=result.get['classification'],
+                    classification=result['classification'],
                     intensity=result.get('intensity'),
                     frequency=result.get('frequency'),
                     snore_index=result.get('snore_index', 'N/A'),
