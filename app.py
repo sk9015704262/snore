@@ -657,7 +657,7 @@ def upload_file():
                         audioStream = audioContext.createMediaStreamSource(stream);
                         gainNode = audioContext.createGain();
                         mediaStreamDestination = audioContext.createMediaStreamDestination();
-                        gainNode.gain.value = 0.5;
+                       
 
                         audioStream.connect(gainNode);
                         gainNode.connect(mediaStreamDestination);
