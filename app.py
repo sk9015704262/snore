@@ -534,23 +534,18 @@ def upload_file():
 
             <script>
                 
-                let mediaRecorder;
-                let audioChunks = [];
-                let recordingTimer;
-                let secondsElapsed = 0;
-
-                let audioContext;
-                let audioStream;
-                let gainNode;
-                let mediaStreamDestination;
-                let currentStream = null;
-
                 const recordButton = document.getElementById("record-btn");
                 const stopButton = document.getElementById("stop-btn");
                 const audioPlayback = document.getElementById("audio-playback");
                 const analyzeButton = document.getElementById("analyze-btn");
                 const recordingForm = document.getElementById("recording-form");
                 const recordingTimerDisplay = document.getElementById("recording-timer");
+
+                let mediaRecorder;
+                let audioChunks = [];
+                let recordingTimer;
+                let secondsElapsed = 0;
+                let currentStream = null;
 
                 async function submitForm(formData) {
                 console.log("Submitting form data")
@@ -603,7 +598,6 @@ def upload_file():
                 }
 
                 function resetRecorder() {
-                    console.log("Resetting recorder...");
                     secondsElapsed = 0;
                     recordingTimerDisplay.textContent = "00:00";
                     recordButton.disabled = false;
@@ -611,31 +605,14 @@ def upload_file():
                     analyzeButton.disabled = true;
 
                     if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                        console.log("Stopping MediaRecorder...");
                         mediaRecorder.stop();
                     }
-
                     if (currentStream) {
-                        console.log("Stopping all audio tracks...");
                         currentStream.getTracks().forEach(track => track.stop());
                         currentStream = null;
                     }
-
                     audioChunks = [];
-
-                    if (audioContext && audioContext.state !== 'closed') {
-                        console.log("Closing audio context...");
-                        audioStream?.disconnect();
-                        gainNode?.disconnect();
-                        mediaStreamDestination?.disconnect();
-                        audioContext.close();
-                    }
-
-                    audioContext = null;
-                    audioStream = null;
-                    gainNode = null;
-                    mediaStreamDestination = null;
-                    mediaRecorder = null;
+                    audioPlayback.src = ""; // Clear previous audio
                 }
 
                 recordButton.addEventListener("click", async () => {
@@ -643,46 +620,27 @@ def upload_file():
                         alert("Your browser does not support audio recording.");
                         return;
                     }
-
                     try {
-                        console.log("Starting audio recording...");
                         resetRecorder();
-
-                        const stream = await navigator.mediaDevices.getUserMedia({ 
-                            audio: {}
-                        });
-
-                        currentStream = stream; 
-                        audioContext = new AudioContext();
-                        audioStream = audioContext.createMediaStreamSource(stream);
-                        gainNode = audioContext.createGain();
-                        mediaStreamDestination = audioContext.createMediaStreamDestination();
-                        gainNode.gain.value = 2; 
-
-                       
-
-                        audioStream.connect(gainNode);
-                        gainNode.connect(mediaStreamDestination);
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        currentStream = stream;
                         mediaRecorder = new MediaRecorder(stream);
-
                         audioChunks = [];
+
                         mediaRecorder.ondataavailable = event => {
                             audioChunks.push(event.data);
-                            console.log(event.data, "Type of Recoreded Audio file")
                         };
 
-                        mediaRecorder.onstop = async () => {
+                        mediaRecorder.onstop = () => {
                             clearInterval(recordingTimer);
-
                             if (secondsElapsed < 10) {
-                                alert("Recording must be at least 10 seconds long. Keep going.");
+                                alert("Recording must be at least 10 seconds long.");
                                 resetRecorder();
                                 return;
                             }
-
                             const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
                             const audioURL = URL.createObjectURL(audioBlob);
-                            audioPlayback.src = audioURL;
+                            audioPlayback.src = audioURL; // Play recorded audio
 
                             const audioFile = new File([audioBlob], `recording_${Date.now()}.wav`, {
                                 type: 'audio/wav'
@@ -695,11 +653,8 @@ def upload_file():
                                 e.preventDefault();
                                 await submitForm(formData);
                             };
-
                             analyzeButton.disabled = false;
                             recordButton.disabled = false;
-
-                            console.log("Audio file created:");
                         };
 
                         mediaRecorder.start();
@@ -711,7 +666,6 @@ def upload_file():
                             const minutes = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
                             const seconds = String(secondsElapsed % 60).padStart(2, "0");
                             recordingTimerDisplay.textContent = `${minutes}:${seconds}`;
-
                             if (secondsElapsed >= 30) {
                                 mediaRecorder.stop();
                                 alert("Recording must be at most 30 seconds long.");
@@ -719,21 +673,17 @@ def upload_file():
                         }, 1000);
                     } catch (error) {
                         console.error("Error accessing microphone:", error);
-                        alert("Error accessing your microphone. Please ensure it is enabled.");
+                        alert("Error accessing your microphone.");
                     }
                 });
 
                 stopButton.addEventListener("click", () => {
-                    console.log("Stop button clicked. Stopping recording...");
                     if (mediaRecorder && mediaRecorder.state === "recording") {
                         mediaRecorder.stop();
                         clearInterval(recordingTimer);
                         stopButton.disabled = true;
-                    } else {
-                        console.warn("MediaRecorder is not in a recording state.");
                     }
                 });
-
                 function closePopup() {
                     const popup = document.getElementById('popup');
                     if (popup) {
@@ -742,6 +692,7 @@ def upload_file():
                     }
                     resetRecorder();
                 }
+
             </script>
     </body>
     </html>
