@@ -26,13 +26,13 @@ labelencoder = LabelEncoder()
 labelencoder.fit(classes)
 
 # Load model
-model_path = 'saved_models/audio_classification18_90(2).keras'
+model_path = 'saved_models/audio_classification18_90(1).keras'
 model = load_model(model_path)
 
 
 DB_PATH = 'snore_audio.db'
 
-def save_prediction_to_db(file_name, classification, intensity, frequency, snore_index, consistency, device='Unknown'):
+def save_prediction_to_db(file_name, classification, intensity, frequency, snore_index, consistency):
     try:
         intensity = float(intensity) if intensity is not None else None
         frequency = float(frequency) if frequency is not None else None
@@ -43,30 +43,31 @@ def save_prediction_to_db(file_name, classification, intensity, frequency, snore
         
         # Ensure the table exists with the new device column
         cursor.execute("""
-        CREATE TABLE IF NOT EXISTS snoring_predictions (
+       CREATE TABLE IF NOT EXISTS snoring_predictions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             file_name TEXT,
             classification TEXT,
             intensity REAL,
             frequency REAL,
             snore_index TEXT,
-            consistency TEXT,
-            device TEXT
+            consistency TEXT
         );
         """)
         
-        # Check if device column exists, if not add it
-        cursor.execute("PRAGMA table_info(snoring_predictions)")
-        columns = [col[1] for col in cursor.fetchall()]
-        if 'device' not in columns:
-            cursor.execute("ALTER TABLE snoring_predictions ADD COLUMN device TEXT DEFAULT 'Unknown'")
         
         sql = """
         INSERT INTO snoring_predictions 
-        (file_name, classification, intensity, frequency, snore_index, consistency, device)
-        VALUES (?, ?, ?, ?, ?, ?, ?);
+        (file_name, classification, intensity, frequency, snore_index, consistency)
+        VALUES (?, ?, ?, ?, ?, ?);
         """
-        cursor.execute(sql, (file_name, classification, intensity, frequency, snore_index, consistency, device))
+        try:
+            cursor.execute(sql, (file_name, classification, intensity, frequency, snore_index, consistency))
+            connection.commit()
+        except sqlite3.Error as e:
+            print(f"SQL Error: {e}, Data: {file_name}, {classification}, {intensity}, {frequency}, {snore_index}, {consistency}")
+            raise
+
+
         connection.commit()
 
     except Exception as e:
@@ -106,22 +107,6 @@ async def async_predict(frames, sample_rate, model, batch_size=32):
         predictions.extend(batch_result)
 
     return predictions
-
-def detect_device(request):
-    user_agent = request.headers.get('User-Agent', '').lower()
-    
-    if 'iphone' in user_agent or 'ipad' in user_agent:
-        return 'iOS'
-    elif 'android' in user_agent:
-        return 'Android'
-    elif 'windows' in user_agent:
-        return 'Windows'
-    elif 'macintosh' in user_agent or 'mac os' in user_agent:
-        return 'MacOS'
-    elif 'linux' in user_agent:
-        return 'Linux'
-    else:
-        return 'Unknown'
         
 
 def analyze_snore_consistency(audio, sample_rate, model, frame_duration=0.4, frame_overlap=0.2, max_gap_threshold=4.0):
@@ -159,7 +144,7 @@ def calculate_snore_index(intensity, frequency):
 def classify_snore_index(snore_index):
     if snore_index < 10.33:
         return "Mild"
-    elif snore_index < 31:
+    elif snore_index < 30:
         return "Moderate"
     else:
         return "Extreme"
@@ -805,7 +790,6 @@ def upload_file():
                     frequency=result.get('frequency'),
                     snore_index=result.get('snore_index', 'N/A'),
                     consistency=result.get('consistency', 'N/A'),
-                    device=detect_device(request)
                 )
                 
 

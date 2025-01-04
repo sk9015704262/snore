@@ -99,8 +99,6 @@
                         <th>Frequency</th>
                         <th>Snore Index</th>
                         <th>Consistency</th>
-                        <th>Device</th>
-
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -158,7 +156,6 @@
                                 <td>${typeof row.frequency === 'number' && isFinite(row.frequency) ? Number(row.frequency).toFixed(2) : 'N/A'}</td>
                                 <td>${row.snore_index ?? 'N/A'}</td>
                                 <td>${row.consistency ?? 'N/A'}</td>
-                                <td>${row.device ?? 'Unknown'}</td>
 
                             `;
                             tableBody.appendChild(tr);
