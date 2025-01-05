@@ -132,15 +132,16 @@ def analyze_snore_consistency(audio, sample_rate, model, frame_duration=0.4, fra
         return "Irregular: No snoring detected"
 
 def calculate_snore_index(intensity, frequency):
-    normalized_intensity = np.clip((intensity - 50) / 50, 0, 1) * 100
-    normalized_frequency = np.clip((frequency - 20) / 300, 0, 1) * 100
-    snore_index = (normalized_intensity * 0.4 + normalized_frequency * 0.3) 
+    normalized_intensity = np.clip((intensity - 35) / 15, 0, 1) * 100
+    normalized_frequency = np.clip((frequency - 1500) / 2000, 0, 1) * 100
+    snore_index = (normalized_intensity * 0.6 + normalized_frequency * 0.2)
+    
     return np.clip(snore_index, 0, 100)
 
 def classify_snore_index(snore_index):
-    if snore_index < 10.33:
+    if snore_index < 20:
         return "Mild"
-    elif snore_index < 31:
+    elif snore_index < 50:
         return "Moderate"
     else:
         return "Extreme"
