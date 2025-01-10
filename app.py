@@ -174,6 +174,10 @@ def analyze_audio_directly(audio_binary):
         predicted_label = np.argmax(predicted_probabilities, axis=1)
         prediction_class = labelencoder.inverse_transform(predicted_label)[0]
 
+        # max_prob = np.max(predicted_probabilities)
+        # if max_prob < 0.9:  
+        #     prediction_class = "No-snoring"
+
         if prediction_class == "Snoring":
             prediction_class = "Male-snoring"
 
@@ -555,7 +559,6 @@ def upload_file():
                         const resultText = doc.querySelector('#result')?.textContent;
                         
                         if (resultText) {
-                            // Create and show popup with result
                             console.log("Server response received:", resultText);
                             const popupHTML = `
                                 <div id="popup" class="popup show">
@@ -566,7 +569,6 @@ def upload_file():
                                     <pre id="result">${resultText}</pre>
                                 </div>`;
                             
-                            // Remove existing popup if any
                             const existingPopup = document.getElementById('popup');
                             if (existingPopup) {
                                 existingPopup.remove();
@@ -631,7 +633,7 @@ def upload_file():
                         resetRecorder();
 
                         const stream = await navigator.mediaDevices.getUserMedia({ 
-                            audio: {}
+                        audio: {}  
                         });
 
                         currentStream = stream; 
@@ -660,7 +662,7 @@ def upload_file():
                                 return;
                             }
 
-                            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                            const audioBlob = new Blob(audioChunks, { type: 'audio/mp4' });
                             const audioURL = URL.createObjectURL(audioBlob);
                             audioPlayback.src = audioURL;
 
@@ -755,10 +757,8 @@ def upload_file():
                 audio = AudioSegment.from_file(io.BytesIO(audio_binary))
                 audio = audio.set_frame_rate(16000)
                 
-                # Apply gain (4.0 = +12dB)
                 audio = audio + 12
                 
-                # Export as WAV
                 wav_io = io.BytesIO()
                 audio.export(wav_io, format='wav')
                 audio_binary = wav_io.getvalue()
@@ -770,7 +770,6 @@ def upload_file():
             result = analyze_audio_directly(audio_binary)
             
             if isinstance(result, dict):
-                # Save file only after successful analysis
                 file_path = os.path.join(SAVED_FOLDER, filename)
                 with open(file_path, 'wb') as f:
                     f.write(audio_binary)
