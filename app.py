@@ -174,9 +174,6 @@ def analyze_audio_directly(audio_binary):
         predicted_label = np.argmax(predicted_probabilities, axis=1)
         prediction_class = labelencoder.inverse_transform(predicted_label)[0]
 
-        # max_prob = np.max(predicted_probabilities)
-        # if max_prob < 0.9:  
-        #     prediction_class = "No-snoring"
 
         if prediction_class == "Snoring":
             prediction_class = "Male-snoring"
@@ -641,11 +638,13 @@ def upload_file():
                         audioStream = audioContext.createMediaStreamSource(stream);
                         gainNode = audioContext.createGain();
                         mediaStreamDestination = audioContext.createMediaStreamDestination();
-                        gainNode.gain.value = 0.5;
+                        gainNode.gain.value = 0.0;
 
                         audioStream.connect(gainNode);
                         gainNode.connect(mediaStreamDestination);
-                        mediaRecorder = new MediaRecorder(stream);
+                        mediaRecorder = new MediaRecorder(stream, {
+                            mimeType: 'audio/mp4'  
+                        });
 
                         audioChunks = [];
                         mediaRecorder.ondataavailable = event => {
@@ -664,6 +663,7 @@ def upload_file():
 
                             const audioBlob = new Blob(audioChunks, { type: 'audio/mp4' });
                             const audioURL = URL.createObjectURL(audioBlob);
+                            console.log(audioBlob, "converted blob")
                             audioPlayback.src = audioURL;
 
                             const audioFile = new File([audioBlob], `recording_${Date.now()}.wav`, {
