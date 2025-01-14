@@ -189,11 +189,12 @@ def analyze_audio_directly(audio_binary):
             rmse_db = librosa.amplitude_to_db(rmse, ref=np.max)
             average_intensity = np.mean(rmse_db)
 
-            os_name == platform.system()
+            target_dB = 0
+            os_name = platform.system()
             if os_name == "Android":
                 target_dB = 85
-
-            target_dB = 60
+            else:
+                target_dB = 60
             intensity = average_intensity + target_dB
 
             stft = np.abs(librosa.stft(audio))
