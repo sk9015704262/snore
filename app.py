@@ -191,10 +191,11 @@ def analyze_audio_directly(audio_binary):
 
             target_dB = 0
             os_name = platform.system()
-            if os_name == "Android":
+            if os_name == "Linux":
                 target_dB = 85
             else:
                 target_dB = 60
+
             intensity = average_intensity + target_dB
 
             stft = np.abs(librosa.stft(audio))
