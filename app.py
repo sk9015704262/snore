@@ -7,6 +7,7 @@ import sqlite3
 import io
 import datetime
 from pydub import AudioSegment
+import platform
 import pandas as pd
 import soundfile as sf
 from scipy.io import wavfile
@@ -159,8 +160,8 @@ def analyze_audio_directly(audio_binary):
             audio = np.mean(audio, axis=1)
         
         duration = len(audio) / sample_rate
-        if duration < 10.0:
-            return "Error: Audio length must be at least 10 seconds."
+        if duration < 15.0:
+            return "Error: Audio length must be at least 15 seconds."
         if duration > 30.0:
             return "Error: Audio length must not exceed 30 seconds."
 
@@ -194,7 +195,7 @@ def analyze_audio_directly(audio_binary):
                 target_dB = 80
             else:
                 target_dB = 60
-                
+
             intensity = average_intensity + target_dB
 
             stft = np.abs(librosa.stft(audio))
@@ -497,7 +498,7 @@ def upload_file():
     </head>
     <body>
         <h1>Snoring Detection</h1>
-        <h3>Note: <span style="font-size: 0.9em; font-weight: normal;">Audio should be between 10 to 30 seconds long for accurate analysis.</span></h3>
+        <h3>Note: <span style="font-size: 0.9em; font-weight: normal;">Audio should be between 15 to 30 seconds long for accurate analysis.</span></h3>
         <div class="container">
             <div class="section">
                 <h2>Record Audio</h2>
@@ -663,7 +664,7 @@ def upload_file():
                             clearInterval(recordingTimer);
 
                             if (secondsElapsed < 15) {
-                                alert("Recording must be at least 10 seconds long. Keep going.");
+                                alert("Recording must be at least 15 seconds long. Keep going.");
                                 resetRecorder();
                                 return;
                             }
