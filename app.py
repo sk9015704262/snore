@@ -192,7 +192,7 @@ def analyze_audio_directly(audio_binary):
             target_dB = 0
             os_name = platform.system()
             if os_name == "Linux":
-                target_dB = 85
+                target_dB = 80
             else:
                 target_dB = 60
 
