@@ -3,7 +3,6 @@ import warnings
 import librosa
 import numpy as np
 import asyncio
-import platform
 import sqlite3
 import io
 import datetime
@@ -195,7 +194,7 @@ def analyze_audio_directly(audio_binary):
                 target_dB = 80
             else:
                 target_dB = 60
-
+                
             intensity = average_intensity + target_dB
 
             stft = np.abs(librosa.stft(audio))
@@ -311,6 +310,7 @@ def upload_file():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Snoring Detection dev</title>
         <style>
+            /* Keep all existing styles unchanged */
             body {
                 display: flex;
                 flex-direction: column;
@@ -497,7 +497,7 @@ def upload_file():
     </head>
     <body>
         <h1>Snoring Detection</h1>
-        <h3>Note: <span style="font-size: 0.9em; font-weight: normal;">Audio should be between 15 to 30 seconds long for accurate analysis.</span></h3>
+        <h3>Note: <span style="font-size: 0.9em; font-weight: normal;">Audio should be between 10 to 30 seconds long for accurate analysis.</span></h3>
         <div class="container">
             <div class="section">
                 <h2>Record Audio</h2>
@@ -521,7 +521,9 @@ def upload_file():
         </div>
         {% endif %}
         <pre id="result" class="hide"></pre>
+
             <script>
+                
                 let mediaRecorder;
                 let audioChunks = [];
                 let recordingTimer;
@@ -544,7 +546,7 @@ def upload_file():
                 console.log("Submitting form data")
                     document.getElementById('loader').style.display = 'block';
                     try {
-                        const response = await fetch(window.location.href, {    
+                        const response = await fetch(window.location.href, {
                             method: 'POST',
                             body: formData
                         });
@@ -643,14 +645,12 @@ def upload_file():
                         audioStream = audioContext.createMediaStreamSource(stream);
                         gainNode = audioContext.createGain();
                         mediaStreamDestination = audioContext.createMediaStreamDestination();
-                        gainNode.gain.value = 0.5;
+                        gainNode.gain.value = 0.0;
 
                         audioStream.connect(gainNode);
                         gainNode.connect(mediaStreamDestination);
                         mediaRecorder = new MediaRecorder(stream, {
-                            mimeType: 'audio/mp4',
-                            audioBitsPerSecond: 128000
-
+                            mimeType: 'audio/mp4'  
                         });
 
                         audioChunks = [];
@@ -663,7 +663,7 @@ def upload_file():
                             clearInterval(recordingTimer);
 
                             if (secondsElapsed < 15) {
-                                alert("Recording must be at least 15 seconds long. Keep going.");
+                                alert("Recording must be at least 10 seconds long. Keep going.");
                                 resetRecorder();
                                 return;
                             }
