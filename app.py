@@ -21,7 +21,6 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-# Define classes and initialize label encoder
 classes = ['Snoring', 'No-snoring', 'Male-snoring', 'Female-snoring']
 labelencoder = LabelEncoder()
 labelencoder.fit(classes)
@@ -293,7 +292,114 @@ def get_database_data():
 def serve_audio(filename):
     return send_from_directory('saved_uploads', filename)
 
-# Add this route to serve db.html
+
+@app.route('/analyze-recording', methods=['GET', 'POST', 'OPTIONS'])
+def analyze_recording_api():
+    print("subra;")
+    # Handle OPTIONS request for CORS preflight
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'POST')
+        return response
+        
+    if request.method == 'GET':
+        return jsonify({
+            'message': 'This endpoint accepts POST requests with audio files for analysis.',
+            'usage': {
+                'method': 'POST',
+                'content-type': 'multipart/form-data',
+                'required_fields': {
+                    'audiofile': 'audio file (WAV, MP3, etc.)',
+                    'user_id': 'string (optional)'
+                }
+            }
+        })
+        
+    try:
+        if 'audiofile' not in request.files:
+            return jsonify({
+                'error': 'No audio file provided'
+            }), 400
+                
+        file = request.files['audiofile']
+        user_id = request.form.get('user_id', 'anonymous')
+        
+        if not file:
+            return jsonify({
+                'error': 'Empty file provided'
+            }), 400
+    
+        audio_binary = file.read()
+        filename = file.filename
+        
+        try:
+            audio = AudioSegment.from_file(io.BytesIO(audio_binary))
+            audio = audio.set_frame_rate(16000)
+            audio = audio + 12
+            
+            wav_io = io.BytesIO()
+            audio.export(wav_io, format='wav')
+            audio_binary = wav_io.getvalue()
+            filename = f"{user_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.wav"
+        except Exception as e:
+            return jsonify({
+                'error': f'Error processing audio: {str(e)}'
+            }), 400
+
+        result = analyze_audio_directly(audio_binary)
+        
+        if isinstance(result, dict):
+            # Save file
+            file_path = os.path.join(SAVED_FOLDER, filename)
+            with open(file_path, 'wb') as f:
+                f.write(audio_binary)
+            
+            # Save to database
+            save_prediction_to_db(
+                file_name=filename,
+                classification=result['classification'],
+                intensity=result.get('intensity'),
+                frequency=result.get('frequency'),
+                snore_index=result.get('snore_index', 'N/A'),
+                consistency=result.get('consistency', 'N/A')
+            )
+            
+            # Prepare API response
+            response_data = {
+                'success': True,
+                'data': {
+                    'file_name': filename,
+                    'classification': result['classification'],
+                    'audio_url': f'/saved_uploads/{filename}'
+                }
+            }
+            
+            if result['classification'] != 'No-snoring':
+                response_data['data'].update({
+                    'intensity': round(result['intensity'], 2),
+                    'frequency': round(result['frequency'], 2),
+                    'snore_index': result['snore_index'],
+                    'consistency': result['consistency']
+                })
+            
+            return jsonify(response_data), 200
+            
+        else:
+            return jsonify({
+                'error': str(result)
+            }), 400
+
+    except Exception as e:
+        return jsonify({
+            'error': f'Server error: {str(e)}'
+        }), 500
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
 @app.route('/db.html')
 def database_page():
     try:
