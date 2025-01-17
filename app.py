@@ -193,7 +193,7 @@ def analyze_audio_directly(audio_binary):
             target_dB = 0
             os_name = platform.system()
             if os_name == "Linux":
-                target_dB = 80
+                target_dB = 75
             else:
                 target_dB = 60
 
@@ -245,7 +245,6 @@ os.makedirs(SAVED_FOLDER, exist_ok=True)
 
 
 @app.route('/download_csv')
-@cross_origin()
 def download_csv():
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -269,7 +268,6 @@ def download_csv():
 
 
 @app.route('/get_database_data')
-@cross_origin()
 def get_database_data():
     try:
         connection = sqlite3.connect(DB_PATH)
@@ -302,12 +300,10 @@ def get_database_data():
         connection.close()
 
 @app.route('/saved_uploads/<filename>')
-@cross_origin()
 def serve_audio(filename):
     return send_from_directory('saved_uploads', filename)
 
 @app.route('/analyze-recording', methods=['GET', 'POST', 'OPTIONS'])
-@cross_origin()
 def analyze_recording_api():
     print("subra;")
     # Handle OPTIONS request for CORS preflight
@@ -413,7 +409,6 @@ def analyze_recording_api():
 
 
 @app.route('/db.html')
-@cross_origin()
 def database_page():
     try:
         return send_file('db.html')
@@ -421,7 +416,6 @@ def database_page():
         return f"Error loading database page: {str(e)}", 500
 
 @app.route('/', methods=['GET', 'POST'])
-@cross_origin()
 def upload_file():
     html_template = """
    <!DOCTYPE html>
