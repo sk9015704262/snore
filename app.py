@@ -160,11 +160,6 @@ def analyze_audio_directly(audio_binary):
         if len(audio.shape) > 1:
             audio = np.mean(audio, axis=1)
         
-        duration = len(audio) / sample_rate
-        if duration < 10.0:
-            return "Error: Audio length must be at least 10 seconds."
-        if duration > 30.0:
-            return "Error: Audio length must not exceed 30 seconds."
 
         mfccs_features = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=30)
         delta_mfcc = librosa.feature.delta(mfccs_features)
@@ -776,12 +771,6 @@ def upload_file():
                         mediaRecorder.onstop = async () => {
                             clearInterval(recordingTimer);
 
-                            if (secondsElapsed < 10) {
-                                alert("Recording must be at least 10 seconds long. Keep going.");
-                                resetRecorder();
-                                return;
-                            }
-
                             const audioBlob = new Blob(audioChunks, { type: 'audio/mp4' });
                             const audioURL = URL.createObjectURL(audioBlob);
                             console.log(audioBlob, "converted blob")
@@ -814,11 +803,6 @@ def upload_file():
                             const minutes = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
                             const seconds = String(secondsElapsed % 60).padStart(2, "0");
                             recordingTimerDisplay.textContent = `${minutes}:${seconds}`;
-
-                            if (secondsElapsed >= 30) {
-                                mediaRecorder.stop();
-                                alert("Recording must be at most 30 seconds long.");
-                            }
                         }, 1000);
                     } catch (error) {
                         console.error("Error accessing microphone:", error);
