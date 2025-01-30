@@ -23,12 +23,12 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-classes = ['Snoring', 'No-snoring', 'Male-snoring', 'Female-snoring']
+classes = ['Snoring', 'No-snoring']
 labelencoder = LabelEncoder()
 labelencoder.fit(classes)
 
 # Load model
-model_path = 'saved_models/audio_classification18_90(2).keras'
+model_path = r'saved_models\audio_classification_again(1).keras'
 model = load_model(model_path)
 
 
@@ -42,9 +42,7 @@ def save_prediction_to_db(file_name, classification, intensity, frequency, snore
         # Connect to SQLite3 database
         connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
-        print(type(file_name), type(classification), type(intensity), type(frequency), type(snore_index), type(consistency))
         
-        # Ensure the table exists
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS snoring_predictions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,10 +51,10 @@ def save_prediction_to_db(file_name, classification, intensity, frequency, snore
             intensity REAL,
             frequency REAL,
             snore_index TEXT,
-            consistency TEXT
+            consistency TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """)
-        
         
         sql = """
         INSERT INTO snoring_predictions 
@@ -64,9 +62,6 @@ def save_prediction_to_db(file_name, classification, intensity, frequency, snore
         VALUES (?, ?, ?, ?, ?, ?);
         """
         cursor.execute(sql, (file_name, classification, intensity, frequency, snore_index, consistency))
-        # cursor.execute("SELECT * FROM snoring_predictions")
-        # result = cursor.fetchall()
-        # print (result)
         connection.commit()
 
     except Exception as e:
@@ -75,8 +70,9 @@ def save_prediction_to_db(file_name, classification, intensity, frequency, snore
         connection.close()
 
 
+
 # Feature extraction with threading
-def extract_features(frames, sample_rate, n_mfcc=30):
+def extract_features(frames, sample_rate, n_mfcc=40):
     def process_frame(frame):
         mfccs_features = librosa.feature.mfcc(y=frame, sr=sample_rate, n_mfcc=n_mfcc)
         delta_mfcc = librosa.feature.delta(mfccs_features)
@@ -119,7 +115,7 @@ def analyze_snore_consistency(audio, sample_rate, model, frame_duration=0.4, fra
     for i, pred_idx in enumerate(predictions):
         prediction_class = labelencoder.inverse_transform([pred_idx])[0]
         current_time = i * (frame_duration * (1 - frame_overlap))
-        if prediction_class in ['Snoring', 'Male-snoring', 'Female-snoring']:
+        if prediction_class in ['Snoring']:
             if not is_snoring:
                 is_snoring = True
                 snoring_frames.append(current_time)
@@ -161,7 +157,7 @@ def analyze_audio_directly(audio_binary):
             audio = np.mean(audio, axis=1)
         
 
-        mfccs_features = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=30)
+        mfccs_features = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=40)
         delta_mfcc = librosa.feature.delta(mfccs_features)
         delta2_mfcc = librosa.feature.delta(mfccs_features, order=2)
         combined_features = np.concatenate((mfccs_features, delta_mfcc, delta2_mfcc), axis=0)
@@ -171,9 +167,6 @@ def analyze_audio_directly(audio_binary):
         predicted_label = np.argmax(predicted_probabilities, axis=1)
         prediction_class = labelencoder.inverse_transform(predicted_label)[0]
 
-
-        if prediction_class == "Snoring":
-            prediction_class = "Male-snoring"
 
         result = {
             'classification': prediction_class,
@@ -886,10 +879,9 @@ def upload_file():
                     intensity=result.get('intensity'),
                     frequency=result.get('frequency'),
                     snore_index=result.get('snore_index', 'N/A'),
-                    consistency=result.get('consistency', 'N/A'),
+                    consistency=result.get('consistency', 'N/A')
                 )
                 
-
                 display_result = "\n"     
                 if result['classification'] == 'No-snoring':
                     display_result = f"Classification: {result['classification']}\n"
