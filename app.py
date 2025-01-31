@@ -19,18 +19,15 @@ from tensorflow.keras.models import load_model
 from concurrent.futures import ThreadPoolExecutor
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-classes = ['Snoring', 'No-snoring']
+classes = ['Snoring', 'No-snoring', 'Male-snoring', 'Female-snoring']
 labelencoder = LabelEncoder()
 labelencoder.fit(classes)
 
-# Load model
-model_path = r'saved_models\audio_classification_again(1).keras'
+model_path = 'saved_models/audio_classification18_90(2).keras'
 model = load_model(model_path)
-
 
 DB_PATH = 'snore_audio.db'
 
@@ -39,9 +36,9 @@ def save_prediction_to_db(file_name, classification, intensity, frequency, snore
         intensity = float(intensity) if intensity is not None else None
         frequency = float(frequency) if frequency is not None else None
         
-        # Connect to SQLite3 database
         connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
+        print(type(file_name), type(classification), type(intensity), type(frequency), type(snore_index), type(consistency))
         
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS snoring_predictions (
@@ -51,10 +48,10 @@ def save_prediction_to_db(file_name, classification, intensity, frequency, snore
             intensity REAL,
             frequency REAL,
             snore_index TEXT,
-            consistency TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            consistency TEXT
         );
         """)
+        
         
         sql = """
         INSERT INTO snoring_predictions 
@@ -70,9 +67,7 @@ def save_prediction_to_db(file_name, classification, intensity, frequency, snore
         connection.close()
 
 
-
-# Feature extraction with threading
-def extract_features(frames, sample_rate, n_mfcc=40):
+def extract_features(frames, sample_rate, n_mfcc=30):
     def process_frame(frame):
         mfccs_features = librosa.feature.mfcc(y=frame, sr=sample_rate, n_mfcc=n_mfcc)
         delta_mfcc = librosa.feature.delta(mfccs_features)
@@ -84,7 +79,6 @@ def extract_features(frames, sample_rate, n_mfcc=40):
         features = list(executor.map(process_frame, frames))
     return np.vstack(features)
 
-# Asynchronous batch prediction
 async def async_predict(frames, sample_rate, model, batch_size=32):
     predictions = []
 
@@ -115,7 +109,7 @@ def analyze_snore_consistency(audio, sample_rate, model, frame_duration=0.4, fra
     for i, pred_idx in enumerate(predictions):
         prediction_class = labelencoder.inverse_transform([pred_idx])[0]
         current_time = i * (frame_duration * (1 - frame_overlap))
-        if prediction_class in ['Snoring']:
+        if prediction_class in ['Snoring', 'Male-snoring', 'Female-snoring']:
             if not is_snoring:
                 is_snoring = True
                 snoring_frames.append(current_time)
@@ -157,16 +151,34 @@ def analyze_audio_directly(audio_binary):
             audio = np.mean(audio, axis=1)
         
 
-        mfccs_features = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=40)
+        mfccs_features = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=30)
         delta_mfcc = librosa.feature.delta(mfccs_features)
         delta2_mfcc = librosa.feature.delta(mfccs_features, order=2)
         combined_features = np.concatenate((mfccs_features, delta_mfcc, delta2_mfcc), axis=0)
         mfccs_scaled_features = np.mean(combined_features.T, axis=0).reshape(1, -1)
 
-        predicted_probabilities = model.predict(mfccs_scaled_features, verbose=0)
-        predicted_label = np.argmax(predicted_probabilities, axis=1)
-        prediction_class = labelencoder.inverse_transform(predicted_label)[0]
+        # predicted_probabilities = model.predict(mfccs_scaled_features, verbose=0)
+        # predicted_label = np.argmax(predicted_probabilities, axis=1)
+        # prediction_class = labelencoder.inverse_transform(predicted_label)[0]
 
+
+        predicted_probabilities = model.predict(mfccs_scaled_features, verbose=0)
+        max_probability = np.max(predicted_probabilities)
+        predicted_label = np.argmax(predicted_probabilities, axis=1)
+        
+        CONFIDENCE_THRESHOLD = 0.65  
+        
+        if max_probability >= CONFIDENCE_THRESHOLD:
+            prediction_class = labelencoder.inverse_transform(predicted_label)[0]
+            if prediction_class == "Snoring":
+                prediction_class = "Male-snoring"
+        else:
+           
+            prediction_class = "No-snoring"
+
+
+        # if prediction_class == "Snoring":
+        #     prediction_class = "Male-snoring"
 
         result = {
             'classification': prediction_class,
@@ -225,7 +237,6 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 app.config['WTF_CSRF_ENABLED'] = True
 app.config['MAX_CONTENT_PATH'] = 16 * 1024 * 1024  
 
-# Create directories for uploads and saved files
 UPLOAD_FOLDER = 'uploads'
 SAVED_FOLDER = 'saved_uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -254,18 +265,15 @@ def download_csv():
     finally:
         conn.close()
 
-
 @app.route('/get_database_data')
 def get_database_data():
     try:
         connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
         
-        # Fetch data from the database
         cursor.execute("SELECT * FROM snoring_predictions ORDER BY id DESC")
         data = cursor.fetchall()
         
-        # Get column names
         cursor.execute("PRAGMA table_info(snoring_predictions)")
         columns = [col[1] for col in cursor.fetchall()]
         
@@ -879,9 +887,10 @@ def upload_file():
                     intensity=result.get('intensity'),
                     frequency=result.get('frequency'),
                     snore_index=result.get('snore_index', 'N/A'),
-                    consistency=result.get('consistency', 'N/A')
+                    consistency=result.get('consistency', 'N/A'),
                 )
                 
+
                 display_result = "\n"     
                 if result['classification'] == 'No-snoring':
                     display_result = f"Classification: {result['classification']}\n"
