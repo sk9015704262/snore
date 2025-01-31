@@ -26,7 +26,7 @@ classes = ['Snoring', 'No-snoring']
 labelencoder = LabelEncoder()
 labelencoder.fit(classes)
 
-model_path = r'saved_models\audio_classification_last_night3.keras'
+model_path = r'./saved_models/audio_classification_last_night3.keras'
 model = load_model(model_path)
 
 DB_PATH = 'snore_audio.db'
