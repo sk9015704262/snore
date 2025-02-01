@@ -99,6 +99,9 @@
                         <th>Frequency</th>
                         <th>Snore Index</th>
                         <th>Consistency</th>
+                        <th>Device OS</th>
+                        <th>Device_Name</th>
+                        <th>Device_browser</th>
                         <th>Date/Time</th>
 
                     </tr>
@@ -158,7 +161,10 @@
                                 <td>${typeof row.frequency === 'number' && isFinite(row.frequency) ? Number(row.frequency).toFixed(2) : 'N/A'}</td>
                                 <td>${row.snore_index ?? 'N/A'}</td>
                                 <td>${row.consistency ?? 'N/A'}</td>
-                                <td>${row.created_at ?? 'N/A'}</td>
+                                <td>${row.device_os ?? 'N/A'}</td>
+                                <td>${row.device_name ?? 'N/A'}</td>
+                                <td>${row.device_browser ?? 'N/A'}</td>
+                                <td>${row.date ?? 'N/A'}</td>
                             `;
                             tableBody.appendChild(tr);
                         } catch (rowError) {
