@@ -26,7 +26,7 @@ classes = ['Snoring', 'No-snoring']
 labelencoder = LabelEncoder()
 labelencoder.fit(classes)
 
-model_path = r'./saved_models/audio_classification_mor2.keras'
+model_path = r'./saved_models/audio_classification_mor3.keras'
 model = load_model(model_path)
 
 DB_PATH = 'snore_audio.db'
@@ -162,17 +162,6 @@ def analyze_audio_directly(audio_binary):
 
         print(predicted_probabilities, "prediction data")
 
-        # snore_prob = predicted_probabilities[0][0]  # Probability of "snore"
-        # no_snore_prob = predicted_probabilities[0][1]  # Probability of "no-snore"
-
-
-        # print(snore_prob)
-        # print(no_snore_prob)    
-
-        # if snore_prob > no_snore_prob:
-        #     print("snore")
-        # else:
-        #     print("no-snore")
 
         prediction_class = labelencoder.inverse_transform(predicted_label)[0]
         
