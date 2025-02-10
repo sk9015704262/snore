@@ -31,42 +31,6 @@ model = load_model(model_path)
 
 DB_PATH = 'snore_audio.db'
 
-def save_prediction_to_db(file_name, classification, intensity, frequency, snore_index, consistency):
-    try:
-        intensity = float(intensity) if intensity is not None else None
-        frequency = float(frequency) if frequency is not None else None
-        
-        connection = sqlite3.connect(DB_PATH)
-        cursor = connection.cursor()
-        print(type(file_name), type(classification), type(intensity), type(frequency), type(snore_index), type(consistency))
-        
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS snoring_predictions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            file_name TEXT,
-            classification TEXT,
-            intensity REAL,
-            frequency REAL,
-            snore_index TEXT,
-            consistency TEXT
-        );
-        """)
-        
-        
-        sql = """
-        INSERT INTO snoring_predictions 
-        (file_name, classification, intensity, frequency, snore_index, consistency)
-        VALUES (?, ?, ?, ?, ?, ?);
-        """
-        cursor.execute(sql, (file_name, classification, intensity, frequency, snore_index, consistency))
-        connection.commit()
-
-    except Exception as e:
-        print(f"Error saving to database: {e}")
-    finally:
-        connection.close()
-
-
 def extract_features(frames, sample_rate, n_mfcc=40):
     def process_frame(frame):
         mfccs_features = librosa.feature.mfcc(y=frame, sr=sample_rate, n_mfcc=n_mfcc)
@@ -349,15 +313,6 @@ def analyze_recording_api():
             with open(file_path, 'wb') as f:
                 f.write(audio_binary)
             
-            # Save to database
-            save_prediction_to_db(
-                file_name=filename,
-                classification=result['classification'],
-                intensity=result.get('intensity'),
-                frequency=result.get('frequency'),
-                snore_index=result.get('snore_index', 'N/A'),
-                consistency=result.get('consistency', 'N/A')
-            )
             
             # Prepare API response
             response_data = {
@@ -867,16 +822,6 @@ def upload_file():
                 file_path = os.path.join(SAVED_FOLDER, filename)
                 with open(file_path, 'wb') as f:
                     f.write(audio_binary)
-                
-                # Save to database
-                save_prediction_to_db(
-                    file_name=filename,
-                    classification=result['classification'],
-                    intensity=result.get('intensity'),
-                    frequency=result.get('frequency'),
-                    snore_index=result.get('snore_index', 'N/A'),
-                    consistency=result.get('consistency', 'N/A'),
-                )
                 
 
                 display_result = "\n"     
